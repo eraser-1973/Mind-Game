@@ -1,0 +1,7 @@
+node_modules/
+dist/
+playtest-artifacts/
+doc-preview-pressure/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
