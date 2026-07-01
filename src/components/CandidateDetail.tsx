@@ -14,6 +14,7 @@ type Props = {
   investigationLocked: boolean
   onVerify: (type: VerifyType) => void
   onRate: (stage: RatingStage, value: number) => void
+  onScorePreview?: (stage: RatingStage, value: number) => void
 }
 
 export function CandidateDetail({
@@ -23,6 +24,7 @@ export function CandidateDetail({
   investigationLocked,
   onVerify,
   onRate,
+  onScorePreview,
 }: Props) {
   return (
     <article className="candidate-detail panel">
@@ -87,9 +89,10 @@ export function CandidateDetail({
 
       <RatingPanel
         candidateId={candidate.id}
-        runtime={runtime}
-        onRate={onRate}
-      />
+      runtime={runtime}
+      onRate={onRate}
+      onScorePreview={onScorePreview}
+    />
     </article>
   )
 }

@@ -4,6 +4,7 @@ import type {
   GameLog,
   GameMode,
   GameState,
+  NikoMessage,
   PressureStage,
   RatingStage,
   SunkCostChoice,
@@ -39,6 +40,7 @@ export type GameAction =
   | { type: 'RESUME_PLAYING' }
   | { type: 'FINAL_SELECT'; candidateId: string; nowMs: number }
   | { type: 'DISMISS_NOTICE' }
+  | { type: 'NIKO_FEEDBACK'; message: NikoMessage }
 
 const createRuntimeState = (
   candidateId: string,
@@ -78,6 +80,7 @@ export function createInitialGameState(
     ),
     logs: [],
     chats: [],
+    nikoMessages: [],
     sunkCostChoice: null,
     sunkCostShown: false,
     finalCandidateId: null,
@@ -141,6 +144,21 @@ export function gameReducer(
   state: GameState,
   action: GameAction,
 ): GameState {
+  if (action.type === 'NIKO_FEEDBACK') {
+    const existingIndex = state.nikoMessages.findIndex(
+      (message) => message.id === action.message.id,
+    )
+    const nikoMessages = [...state.nikoMessages]
+
+    if (existingIndex === -1) {
+      nikoMessages.push(action.message)
+    } else {
+      nikoMessages[existingIndex] = action.message
+    }
+
+    return { ...state, nikoMessages }
+  }
+
   if (action.type === 'DISMISS_NOTICE') {
     return { ...state, notice: null }
   }

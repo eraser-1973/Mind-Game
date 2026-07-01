@@ -6,11 +6,13 @@ import {
   gameReducer,
 } from '../state/gameReducer'
 import type { GameMode } from '../types/game'
+import { createNikoFeedback } from '../utils/nikoFeedback'
 import { generateReport } from '../utils/report'
 import { CandidateDetail } from './CandidateDetail'
 import { CandidateList } from './CandidateList'
 import { FinalDecisionPanel } from './FinalDecisionPanel'
 import { HRChatPanel } from './HRChatPanel'
+import { NikoChatPanel } from './NikoChatPanel'
 import { ReportScreen } from './ReportScreen'
 import { SunkCostModal } from './SunkCostModal'
 import { TimerBar } from './TimerBar'
@@ -37,6 +39,8 @@ export function GameScreen({ mode, onRestart }: Props) {
   }, [state.phase])
 
   const initialRatingsComplete = allT1Rated(state)
+  const showNikoFeedback =
+    mode === 'formal' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]
   const toxicFocus = candidates
     .filter((candidate) => candidate.isToxic)
@@ -108,8 +112,28 @@ export function GameScreen({ mode, onRestart }: Props) {
               value,
             })
           }
+          onScorePreview={(stage, value) => {
+            if (!showNikoFeedback || stage === 'T1') return
+            const message = createNikoFeedback({
+              candidate: selected,
+              runtime: state.runtime[selected.id],
+              stage,
+              value,
+              timestamp: state.elapsedSec,
+            })
+            if (message) {
+              dispatch({ type: 'NIKO_FEEDBACK', message })
+            }
+          }}
         />
-        <HRChatPanel chats={state.chats} elapsedSec={state.elapsedSec} />
+        <div
+          className={`feedback-rail${showNikoFeedback ? ' has-niko' : ''}`}
+        >
+          <HRChatPanel chats={state.chats} elapsedSec={state.elapsedSec} />
+          {showNikoFeedback && (
+            <NikoChatPanel messages={state.nikoMessages} />
+          )}
+        </div>
       </div>
 
       <footer className="action-dock">

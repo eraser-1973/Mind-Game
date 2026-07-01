@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   CandidateRuntimeState,
   RatingStage,
@@ -8,6 +8,7 @@ type Props = {
   candidateId: string
   runtime: CandidateRuntimeState
   onRate: (stage: RatingStage, value: number) => void
+  onScorePreview?: (stage: RatingStage, value: number) => void
 }
 
 const nextStage = (
@@ -29,13 +30,31 @@ export function RatingPanel({
   candidateId,
   runtime,
   onRate,
+  onScorePreview,
 }: Props) {
   const stage = nextStage(runtime)
   const [value, setValue] = useState(50)
+  const [hasInteracted, setHasInteracted] = useState(false)
+  const previewCallbackRef = useRef(onScorePreview)
+
+  useEffect(() => {
+    previewCallbackRef.current = onScorePreview
+  }, [onScorePreview])
 
   useEffect(() => {
     setValue(50)
+    setHasInteracted(false)
   }, [candidateId, stage])
+
+  useEffect(() => {
+    if (!hasInteracted || !stage || stage === 'T1') return
+
+    const timer = window.setTimeout(() => {
+      previewCallbackRef.current?.(stage, value)
+    }, 600)
+
+    return () => window.clearTimeout(timer)
+  }, [hasInteracted, stage, value])
 
   return (
     <section className="rating-panel">
@@ -66,7 +85,10 @@ export function RatingPanel({
               min="0"
               max="100"
               value={value}
-              onChange={(event) => setValue(Number(event.target.value))}
+              onChange={(event) => {
+                setValue(Number(event.target.value))
+                setHasInteracted(true)
+              }}
             />
             <span>100</span>
             <output>{value}</output>

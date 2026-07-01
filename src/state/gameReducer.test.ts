@@ -2,6 +2,43 @@ import { describe, expect, it } from 'vitest'
 import { createInitialGameState, gameReducer } from './gameReducer'
 
 describe('gameReducer', () => {
+  it('starts without Niko feedback messages', () => {
+    const initial = createInitialGameState('formal', 1_000)
+
+    expect(initial.nikoMessages).toEqual([])
+  })
+
+  it('adds Niko feedback and replaces the same evidence-stage message', () => {
+    const initial = createInitialGameState('formal', 1_000)
+    const happyMessage = {
+      id: 'niko-C-T2-C-shallow',
+      candidateId: 'C',
+      stage: 'T2' as const,
+      mood: 'happy' as const,
+      text: '抓住了正向证据。',
+      relatedEvidenceId: 'C-shallow',
+      timestamp: 20,
+    }
+    const added = gameReducer(initial, {
+      type: 'NIKO_FEEDBACK',
+      message: happyMessage,
+    })
+    const replaced = gameReducer(added, {
+      type: 'NIKO_FEEDBACK',
+      message: {
+        ...happyMessage,
+        mood: 'angry',
+        text: '忽略了正向证据。',
+        timestamp: 21,
+      },
+    })
+
+    expect(added.nikoMessages).toHaveLength(1)
+    expect(replaced.nikoMessages).toHaveLength(1)
+    expect(replaced.nikoMessages[0].mood).toBe('angry')
+    expect(replaced.nikoMessages[0].timestamp).toBe(21)
+  })
+
   it('starts without preloaded HR broadcast messages', () => {
     const initial = createInitialGameState('quick', 1_000)
 

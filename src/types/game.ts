@@ -4,11 +4,16 @@ export type PressureStage = 'green' | 'orange' | 'red'
 export type SunkCostChoice = 'continue' | 'stop_loss' | 'give_up' | null
 export type GamePhase = 'start' | 'playing' | 'decision' | 'report'
 export type GameMode = 'formal' | 'quick'
+export type EvidencePolarity = 'positive' | 'negative'
+export type RatingDirection = 'higher' | 'lower'
+export type NikoMood = 'happy' | 'angry'
 
 export type Evidence = {
+  id: string
   title: string
   content: string
   isNegative: boolean
+  polarity: EvidencePolarity
 }
 
 export type Candidate = {
@@ -77,6 +82,16 @@ export type ChatMessage = {
   tone: 'neutral' | 'warning' | 'urgent'
 }
 
+export type NikoMessage = {
+  id: string
+  candidateId: string
+  stage: 'T2' | 'T3'
+  mood: NikoMood
+  text: string
+  relatedEvidenceId: string
+  timestamp: number
+}
+
 export type GameState = {
   phase: GamePhase
   mode: GameMode
@@ -88,6 +103,7 @@ export type GameState = {
   runtime: Record<string, CandidateRuntimeState>
   logs: GameLog[]
   chats: ChatMessage[]
+  nikoMessages: NikoMessage[]
   sunkCostChoice: SunkCostChoice
   sunkCostShown: boolean
   finalCandidateId: string | null

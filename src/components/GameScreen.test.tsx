@@ -6,15 +6,18 @@ const mockState = vi.hoisted(() => ({
   state: null as Awaited<
     ReturnType<typeof import('../state/gameReducer')['createInitialGameState']>
   > | null,
-  setState: null as null | ((complete: boolean) => void),
+  setState: null as null | ((complete: boolean, mode?: 'quick' | 'formal') => void),
 }))
 
 vi.mock('../state/gameReducer', async () => {
   const actual = await vi.importActual<typeof import('../state/gameReducer')>(
     '../state/gameReducer',
   )
-  const buildState = (complete: boolean) => {
-    const state = actual.createInitialGameState('quick', 1_000)
+  const buildState = (
+    complete: boolean,
+    mode: 'quick' | 'formal' = 'quick',
+  ) => {
+    const state = actual.createInitialGameState(mode, 1_000)
 
     if (complete) {
       for (const candidateId of Object.keys(state.runtime)) {
@@ -29,9 +32,12 @@ vi.mock('../state/gameReducer', async () => {
   }
 
   mockState.state ??= buildState(false)
-  mockState.setState = (complete: boolean) => {
+  mockState.setState = (
+    complete: boolean,
+    mode: 'quick' | 'formal' = 'quick',
+  ) => {
     mockState.ratingsComplete = complete
-    mockState.state = buildState(complete)
+    mockState.state = buildState(complete, mode)
   }
 
   return {
@@ -55,6 +61,10 @@ vi.mock('./FinalDecisionPanel', () => ({
 
 vi.mock('./HRChatPanel', () => ({
   HRChatPanel: () => <div>HRChatPanel</div>,
+}))
+
+vi.mock('./NikoChatPanel', () => ({
+  NikoChatPanel: () => <div>NikoChatPanel</div>,
 }))
 
 vi.mock('./ReportScreen', () => ({
@@ -96,5 +106,22 @@ describe('GameScreen current task copy', () => {
     expect(html).not.toContain(
       '可以用查证点数，比较证据并锁定最终人选。',
     )
+  })
+
+  it('shows Niko only in the formal second stage and preserves the HR panel', () => {
+    mockState.setState?.(true, 'formal')
+    const formal = renderToStaticMarkup(
+      <GameScreen mode="formal" onRestart={() => undefined} />,
+    )
+
+    mockState.setState?.(true, 'quick')
+    const quick = renderToStaticMarkup(
+      <GameScreen mode="quick" onRestart={() => undefined} />,
+    )
+
+    expect(formal).toContain('HRChatPanel')
+    expect(formal).toContain('NikoChatPanel')
+    expect(quick).toContain('HRChatPanel')
+    expect(quick).not.toContain('NikoChatPanel')
   })
 })
