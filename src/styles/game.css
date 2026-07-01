@@ -1402,6 +1402,7 @@ p {
 }
 
 @media (max-width: 560px) {
+  .game-screen { padding-bottom: 148px; }
   .start-screen { padding: 1rem; }
   .start-card { padding: 1.35rem; }
   .mission-grid { grid-template-columns: 1fr; }
