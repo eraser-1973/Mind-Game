@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="压力择才">
+  <rect x="3" y="3" width="58" height="58" rx="13" fill="#07101f" stroke="#63ddff" stroke-width="3"/>
+  <circle cx="24" cy="22" r="8" fill="#63ddff"/>
+  <path d="M11 47c1.5-9 6-13 13-13s11.5 4 13 13" fill="none" stroke="#63ddff" stroke-width="6" stroke-linecap="round"/>
+  <path d="m38 32 6 6 10-13" fill="none" stroke="#55df9a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
