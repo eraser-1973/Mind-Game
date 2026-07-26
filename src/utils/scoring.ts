@@ -18,14 +18,14 @@ export function calculateROI(
 ): ROIResult {
   if (spentPoints <= 0) {
     return {
-      value: selectedCandidate.trueAbility,
-      note: '未查证直接录用',
+      value: selectedCandidate.baselineFitScore,
+      note: '未查证直接录用；返回该候选人的后台岗位匹配基准分',
       unverifiedHire: true,
     }
   }
   return {
-    value: selectedCandidate.trueAbility / spentPoints,
-    note: '真实能力值 ÷ 对该候选人的查证点数',
+    value: selectedCandidate.baselineFitScore / spentPoints,
+    note: '后台岗位匹配基准分 ÷ 对该候选人的查证点数',
     unverifiedHire: false,
   }
 }

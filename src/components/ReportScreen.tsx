@@ -1,9 +1,16 @@
-import type { ReportData } from '../types/game'
+import type { GameState, ReportData } from '../types/game'
+import {
+  CANDIDATE_DIMENSION_LABELS,
+  CANDIDATE_DIMENSION_WEIGHTS,
+} from '../data/candidates'
+import { exportJson } from '../utils/exportJson'
+import { buildAnonymousResearchExport } from '../utils/researchData'
 import { formatTime } from '../utils/time'
 
 type Props = {
   report: ReportData
   onRestart: () => void
+  sourceState?: GameState
 }
 
 const revisionText = (
@@ -22,9 +29,24 @@ const revisionText = (
   )
 }
 
-export function ReportScreen({ report, onRestart }: Props) {
+export function ReportScreen({ report, onRestart, sourceState }: Props) {
   const selected = report.selectedCandidate
   const logSummary = report.logs.slice(-16)
+  const handleExportJson = () => {
+    const exportData = sourceState
+      ? buildAnonymousResearchExport(report, sourceState)
+      : {
+          schemaVersion: 'mind-game-report-v1',
+          exportedAt: new Date().toISOString(),
+          participantId: report.participantId,
+          report,
+        }
+
+    exportJson(
+      `mind-game-anonymous-${report.participantId ?? 'quick'}-${Date.now()}.json`,
+      exportData,
+    )
+  }
 
   return (
     <main className="report-screen">
@@ -33,6 +55,11 @@ export function ReportScreen({ report, onRestart }: Props) {
           <span className="eyebrow">DECISION RESILIENCE REPORT</span>
           <h1>抗压决策报告</h1>
           <p>报告基于本轮可观察操作生成，不用于临床诊断。</p>
+          {report.researchData && (
+            <p className="anonymous-record-note">
+              研究数据已通过匿名编号 {report.participantId} 记录；本页面仅展示汇总解释，原始匿名数据可由研究者导出。
+            </p>
+          )}
         </div>
         <div className={'rdi-orb rdi-orb--' + report.rdi.level}>
           <span>RDI</span>
@@ -55,16 +82,16 @@ export function ReportScreen({ report, onRestart }: Props) {
           </div>
           <div className="metric-pair">
             <div>
-              <span>真实能力</span>
-              <strong>{selected.trueAbility}</strong>
+              <span>岗位匹配基准</span>
+              <strong>{selected.baselineFitScore}</strong>
             </div>
             <div>
-              <span>岗位匹配</span>
-              <strong>{selected.trueFit}</strong>
+              <span>六维加权结果</span>
+              <strong>{selected.baselineFitScore}</strong>
             </div>
           </div>
           <p>
-            选择结果用于校验证据判断与真实能力之间的距离，而不是评价候选人的人格价值。
+            选择结果用于校验证据判断与岗位匹配基准之间的距离，而不是评价候选人的人格价值。
           </p>
         </article>
 
@@ -80,6 +107,28 @@ export function ReportScreen({ report, onRestart }: Props) {
             <span className="risk-pill">未查证直接录用</span>
           )}
         </article>
+      </section>
+
+      <section className="report-card report-section fit-score-card">
+        <span className="eyebrow">岗位匹配基准分</span>
+        <h2>{selected.baselineFitScore}/100</h2>
+        <p>
+          该分数由附件规定的六个岗位维度加权计算，仅在报告阶段公开，用于解释本轮证据修正与最终选择。
+        </p>
+        <div className="fit-score-grid">
+          {Object.entries(selected.dimensionScores).map(([dimension, score]) => {
+            const key = dimension as keyof typeof CANDIDATE_DIMENSION_LABELS
+            return (
+              <div key={dimension}>
+                <span>{CANDIDATE_DIMENSION_LABELS[key]}</span>
+                <strong>{score}/5</strong>
+                <small>
+                  权重 {Math.round(CANDIDATE_DIMENSION_WEIGHTS[key] * 100)}%
+                </small>
+              </div>
+            )
+          })}
+        </div>
       </section>
 
       <section className="report-grid">
@@ -190,6 +239,9 @@ export function ReportScreen({ report, onRestart }: Props) {
       <footer className="report-actions">
         <button className="button button--primary" onClick={onRestart}>
           重新开始
+        </button>
+        <button className="button button--ghost" onClick={handleExportJson}>
+          导出 JSON 数据
         </button>
       </footer>
     </main>

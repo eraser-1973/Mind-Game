@@ -7,6 +7,13 @@ export type GameMode = 'formal' | 'quick'
 export type EvidencePolarity = 'positive' | 'negative'
 export type RatingDirection = 'higher' | 'lower'
 export type NikoMood = 'happy' | 'angry'
+export type ResearchStep =
+  | 'consent'
+  | 'demographics'
+  | 'preTask'
+  | 'postTask'
+  | 'taskExperience'
+  | 'report'
 
 export type Evidence = {
   id: string
@@ -16,6 +23,27 @@ export type Evidence = {
   polarity: EvidencePolarity
 }
 
+export type CandidateDimensionId =
+  | 'dataAnalysis'
+  | 'userResearch'
+  | 'productExecution'
+  | 'reportExpression'
+  | 'toolApplication'
+  | 'authenticity'
+
+export type CandidateDimensionScores = Record<
+  CandidateDimensionId,
+  number
+>
+
+export type CandidateExperience = {
+  title: string
+  content: string
+}
+
+export type ExpectedScoreRanges = Record<RatingStage, [number, number]>
+export type ExpectedEvidenceUpdate = 'up' | 'down' | 'stable'
+
 export type Candidate = {
   id: string
   name: string
@@ -23,8 +51,18 @@ export type Candidate = {
   school: string
   visibleHalo: string[]
   resumeSummary: string
-  shallowEvidence: Evidence
-  deepEvidence: Evidence
+  education: string
+  skills: string[]
+  experiences: CandidateExperience[]
+  initialImage: string
+  trueStrengths: string
+  mainShortcomings: string
+  shallowEvidence: Evidence[]
+  deepEvidence: Evidence[]
+  dimensionScores: CandidateDimensionScores
+  baselineFitScore: number
+  expectedScoreRanges: ExpectedScoreRanges
+  expectedUpdate: ExpectedEvidenceUpdate
   trueAbility: number
   trueFit: number
   isToxic: boolean
@@ -92,6 +130,72 @@ export type NikoMessage = {
   timestamp: number
 }
 
+export type ConsentRecord = {
+  accepted: boolean
+  acceptedAt: string | null
+}
+
+export type DemographicData = {
+  ageRange: '18–20' | '21–23' | '24及以上' | '不愿透露'
+  gender: '男' | '女' | '其他' | '不愿透露'
+  education: '本科' | '硕士' | '其他' | '不愿透露'
+  grade: '大一' | '大二' | '大三' | '大四' | '研究生' | '不愿透露'
+  majorCategory:
+    | '心理学'
+    | '计算机或人工智能'
+    | '经管'
+    | '理工科'
+    | '人文社科'
+    | '其他'
+    | '不愿透露'
+  relatedExperience: Array<
+    | '企业实习经历'
+    | '学生科研经历'
+    | '数据分析相关经历'
+    | '招聘或人才评估相关经历'
+    | '无相关经历'
+  >
+}
+
+export type StateAssessmentId =
+  | 'stress'
+  | 'fatigue'
+  | 'attention'
+  | 'mood'
+  | 'physicalDiscomfort'
+
+export type StateAssessmentData = Record<StateAssessmentId, number>
+
+export type TaskExperienceId =
+  | 'timePressure1'
+  | 'timePressure2'
+  | 'resourceLimit1'
+  | 'resourceLimit2'
+  | 'socialEvaluation1'
+  | 'socialEvaluation2'
+  | 'outcomeResponsibility1'
+  | 'outcomeResponsibility2'
+  | 'uncontrollability1'
+  | 'uncontrollability2'
+  | 'cognitiveLoad1'
+  | 'cognitiveLoad2'
+  | 'cognitiveLoad3'
+  | 'cognitiveLoad4'
+  | 'decisionConfidence'
+
+export type TaskExperienceData = Record<TaskExperienceId, number>
+
+export type ResearchData = {
+  participantId: string
+  consent: ConsentRecord
+  demographics: DemographicData | null
+  preTask: StateAssessmentData | null
+  postTask: StateAssessmentData | null
+  taskExperience: TaskExperienceData | null
+  startedAt: string
+  completedAt: string | null
+}
+
 export type GameState = {
   phase: GamePhase
   mode: GameMode
@@ -99,6 +203,7 @@ export type GameState = {
   timeLeftSec: number
   elapsedSec: number
   availablePoints: number
+  candidateDisplayOrder: string[]
   selectedCandidateId: string
   runtime: Record<string, CandidateRuntimeState>
   logs: GameLog[]
@@ -110,6 +215,8 @@ export type GameState = {
   activeViewStartedAtMs: number
   lastActionElapsedSec: number
   notice: string | null
+  participantId: string | null
+  researchData: ResearchData | null
 }
 
 export type ROIResult = {
@@ -168,4 +275,7 @@ export type ReportData = {
   logs: GameLog[]
   runtime: Record<string, CandidateRuntimeState>
   sunkCostChoice: SunkCostChoice
+  participantId: string | null
+  researchData: ResearchData | null
+  nikoMessages: NikoMessage[]
 }

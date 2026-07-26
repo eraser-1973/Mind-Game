@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidates } from '../data/candidates'
+import { candidateById } from '../data/candidates'
 import type { GameLog, RDIInput } from '../types/game'
 import {
   calculateRDI,
@@ -21,16 +21,16 @@ const baseLog = (
 })
 
 describe('calculateROI', () => {
-  it('marks a zero-point hire as unverified and returns true ability', () => {
-    expect(calculateROI(candidates[2], 0)).toEqual({
-      value: 88,
-      note: '未查证直接录用',
+  it('marks a zero-point hire as unverified and returns the job-fit baseline', () => {
+    expect(calculateROI(candidateById.B, 0)).toEqual({
+      value: 86,
+      note: '未查证直接录用；返回该候选人的后台岗位匹配基准分',
       unverifiedHire: true,
     })
   })
 
   it('divides ability by spent points', () => {
-    expect(calculateROI(candidates[2], 4).value).toBe(22)
+    expect(calculateROI(candidateById.B, 2).value).toBe(43)
   })
 })
 
@@ -78,9 +78,9 @@ describe('attention and strategy classification', () => {
 
   it('recognizes broad shallow screening followed by focused deep verification', () => {
     const logs = [
-      baseLog({ id: '1', type: 'verify', verifyType: 'shallow', candidateId: 'C', elapsedSec: 10, pointsSpent: 1 }),
+      baseLog({ id: '1', type: 'verify', verifyType: 'shallow', candidateId: 'B', elapsedSec: 10, pointsSpent: 1 }),
       baseLog({ id: '2', type: 'verify', verifyType: 'shallow', candidateId: 'D', elapsedSec: 15, pointsSpent: 1 }),
-      baseLog({ id: '3', type: 'verify', verifyType: 'deep', candidateId: 'C', elapsedSec: 25, pointsSpent: 3 }),
+      baseLog({ id: '3', type: 'verify', verifyType: 'deep', candidateId: 'B', elapsedSec: 25, pointsSpent: 3 }),
     ]
 
     expect(classifyStrategy(logs)).toBe('目标导向型')

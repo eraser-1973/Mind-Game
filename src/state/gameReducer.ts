@@ -7,6 +7,7 @@ import type {
   NikoMessage,
   PressureStage,
   RatingStage,
+  ResearchData,
   SunkCostChoice,
   VerifyType,
 } from '../types/game'
@@ -16,6 +17,7 @@ import {
   getSunkCostThreshold,
   QUICK_DURATION_SEC,
 } from '../utils/time'
+import { shuffleCandidateIds } from '../utils/candidateOrder'
 
 export type GameAction =
   | {
@@ -60,9 +62,13 @@ const createRuntimeState = (
 export function createInitialGameState(
   mode: GameMode,
   nowMs = Date.now(),
+  researchData: ResearchData | null = null,
 ): GameState {
   const durationSec =
     mode === 'quick' ? QUICK_DURATION_SEC : FORMAL_DURATION_SEC
+  const candidateDisplayOrder = shuffleCandidateIds(
+    candidates.map((candidate) => candidate.id),
+  )
 
   return {
     phase: 'playing',
@@ -71,6 +77,7 @@ export function createInitialGameState(
     timeLeftSec: durationSec,
     elapsedSec: 0,
     availablePoints: 5,
+    candidateDisplayOrder,
     selectedCandidateId: candidates[0].id,
     runtime: Object.fromEntries(
       candidates.map((candidate) => [
@@ -87,6 +94,8 @@ export function createInitialGameState(
     activeViewStartedAtMs: nowMs,
     lastActionElapsedSec: 0,
     notice: null,
+    participantId: researchData?.participantId ?? null,
+    researchData,
   }
 }
 
@@ -279,7 +288,7 @@ export function gameReducer(
       }
     }
 
-    const evidence =
+    const evidenceBundle =
       action.verifyType === 'shallow'
         ? candidate.shallowEvidence
         : candidate.deepEvidence
@@ -296,7 +305,8 @@ export function gameReducer(
       deepUnlocked:
         runtime.deepUnlocked || action.verifyType === 'deep',
       negativeEvidenceSeen:
-        runtime.negativeEvidenceSeen || evidence.isNegative,
+        runtime.negativeEvidenceSeen ||
+        evidenceBundle.some((evidence) => evidence.isNegative),
       addedAfterNegative:
         runtime.addedAfterNegative || addedAfterNegative,
     }
@@ -306,7 +316,7 @@ export function gameReducer(
       candidateId: action.candidateId,
       detail: `${
         action.verifyType === 'shallow' ? '浅度' : '深度'
-      }查证：${evidence.title}`,
+      }查证：${evidenceBundle.map((evidence) => evidence.title).join('、')}`,
       pointsSpent: cost,
       negativeEvidenceSeen: nextRuntime.negativeEvidenceSeen,
       addedAfterNegative,
@@ -336,7 +346,9 @@ export function gameReducer(
         ? [...state.chats, warningChat]
         : state.chats,
       lastActionElapsedSec: state.elapsedSec,
-      notice: `已消耗 ${cost} 点，解锁“${evidence.title}”。`,
+      notice: `已消耗 ${cost} 点，解锁 ${evidenceBundle.length} 份${
+        action.verifyType === 'shallow' ? 'T2 浅度' : 'T3 深度'
+      }材料。`,
     }
   }
 

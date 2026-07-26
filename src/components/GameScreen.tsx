@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
 import { candidates, candidateById } from '../data/candidates'
 import {
   allT1Rated,
   createInitialGameState,
   gameReducer,
 } from '../state/gameReducer'
-import type { GameMode } from '../types/game'
+import type {
+  Candidate,
+  GameMode,
+  GameState,
+  ResearchData,
+} from '../types/game'
 import { createNikoFeedback } from '../utils/nikoFeedback'
 import { generateReport } from '../utils/report'
 import { CandidateDetail } from './CandidateDetail'
@@ -20,14 +25,22 @@ import { TimerBar } from './TimerBar'
 type Props = {
   mode: GameMode
   onRestart: () => void
+  researchData?: ResearchData | null
+  onGameComplete?: (state: GameState) => void
 }
 
-export function GameScreen({ mode, onRestart }: Props) {
+export function GameScreen({
+  mode,
+  onRestart,
+  researchData = null,
+  onGameComplete,
+}: Props) {
   const [state, dispatch] = useReducer(
     gameReducer,
-    mode,
-    (initialMode) => createInitialGameState(initialMode),
+    undefined,
+    () => createInitialGameState(mode, Date.now(), researchData),
   )
+  const completionNotifiedRef = useRef(false)
 
   useEffect(() => {
     if (state.phase !== 'playing') return
@@ -42,6 +55,9 @@ export function GameScreen({ mode, onRestart }: Props) {
   const showNikoFeedback =
     mode === 'formal' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]
+  const orderedCandidates = state.candidateDisplayOrder
+    .map((candidateId) => candidateById[candidateId])
+    .filter((candidate): candidate is Candidate => Boolean(candidate))
   const toxicFocus = candidates
     .filter((candidate) => candidate.isToxic)
     .sort(
@@ -54,8 +70,34 @@ export function GameScreen({ mode, onRestart }: Props) {
     [state],
   )
 
+  useEffect(() => {
+    if (!onGameComplete || state.phase !== 'report') return
+    if (completionNotifiedRef.current) return
+    completionNotifiedRef.current = true
+    onGameComplete(state)
+  }, [onGameComplete, state])
+
   if (report) {
-    return <ReportScreen report={report} onRestart={onRestart} />
+    if (onGameComplete) {
+      return (
+        <main className="research-screen">
+          <section className="research-card">
+            <span className="eyebrow">ANONYMOUS DATA BUFFER</span>
+            <h1>正在保存匿名游戏记录…</h1>
+            <p className="research-card__lead">
+              游戏核心数据已完成封存，即将进入任务后状态评估。
+            </p>
+          </section>
+        </main>
+      )
+    }
+    return (
+      <ReportScreen
+        report={report}
+        sourceState={state}
+        onRestart={onRestart}
+      />
+    )
   }
 
   return (
@@ -81,7 +123,7 @@ export function GameScreen({ mode, onRestart }: Props) {
 
       <div className="game-layout">
         <CandidateList
-          candidates={candidates}
+          candidates={orderedCandidates}
           runtime={state.runtime}
           selectedId={state.selectedCandidateId}
           onSelect={(candidateId) =>
@@ -179,7 +221,7 @@ export function GameScreen({ mode, onRestart }: Props) {
 
       {state.phase === 'decision' && (
         <FinalDecisionPanel
-          candidates={candidates}
+          candidates={orderedCandidates}
           runtime={state.runtime}
           timeExpired={state.timeLeftSec === 0}
           onSelect={(candidateId) =>

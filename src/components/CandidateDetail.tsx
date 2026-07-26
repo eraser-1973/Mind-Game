@@ -50,6 +50,18 @@ export function CandidateDetail({
       <section className="resume-block">
         <span className="eyebrow">简历摘要</span>
         <p>{candidate.resumeSummary}</p>
+        <p className="resume-block__education">{candidate.education}</p>
+        <div className="tag-row">
+          {candidate.skills.map((skill) => <span key={skill}>{skill}</span>)}
+        </div>
+        <div className="experience-list">
+          {candidate.experiences.map((experience) => (
+            <article key={experience.title}>
+              <strong>{experience.title}</strong>
+              <p>{experience.content}</p>
+            </article>
+          ))}
+        </div>
         <div className="tag-row">
           {candidate.tags.map((tag) => <span key={tag}>#{tag}</span>)}
         </div>
@@ -70,20 +82,20 @@ export function CandidateDetail({
               <h3>已解锁材料</h3>
             </div>
           </div>
-          {runtime.shallowUnlocked && (
-            <article className={'evidence-card ' + (candidate.shallowEvidence.isNegative ? 'is-negative' : 'is-positive')}>
-              <span>浅度证据</span>
-              <strong>{candidate.shallowEvidence.title}</strong>
-              <p>{candidate.shallowEvidence.content}</p>
+          {runtime.shallowUnlocked && candidate.shallowEvidence.map((evidence, index) => (
+            <article key={evidence.id} className={'evidence-card ' + (evidence.isNegative ? 'is-negative' : 'is-positive')}>
+              <span>T2 浅度查证 · 材料 {index + 1}</span>
+              <strong>{evidence.title}</strong>
+              <p>{evidence.content}</p>
             </article>
-          )}
-          {runtime.deepUnlocked && (
-            <article className={'evidence-card ' + (candidate.deepEvidence.isNegative ? 'is-negative' : 'is-positive')}>
-              <span>深度证据</span>
-              <strong>{candidate.deepEvidence.title}</strong>
-              <p>{candidate.deepEvidence.content}</p>
+          ))}
+          {runtime.deepUnlocked && candidate.deepEvidence.map((evidence, index) => (
+            <article key={evidence.id} className={'evidence-card ' + (evidence.isNegative ? 'is-negative' : 'is-positive')}>
+              <span>T3 深度查证 · 材料 {index + 1}</span>
+              <strong>{evidence.title}</strong>
+              <p>{evidence.content}</p>
             </article>
-          )}
+          ))}
         </section>
       )}
 

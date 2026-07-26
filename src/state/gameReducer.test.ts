@@ -2,6 +2,27 @@ import { describe, expect, it } from 'vitest'
 import { createInitialGameState, gameReducer } from './gameReducer'
 
 describe('gameReducer', () => {
+  it('can attach anonymous research data to a formal game session', () => {
+    const researchData = {
+      participantId: 'MG-TEST-123',
+      consent: {
+        accepted: true,
+        acceptedAt: '2026-07-26T00:00:00.000Z',
+      },
+      demographics: null,
+      preTask: null,
+      postTask: null,
+      taskExperience: null,
+      startedAt: '2026-07-26T00:00:00.000Z',
+      completedAt: null,
+    }
+    const initial = createInitialGameState('formal', 1_000, researchData)
+
+    expect(initial.participantId).toBe('MG-TEST-123')
+    expect(initial.researchData?.consent.accepted).toBe(true)
+    expect(initial.durationSec).toBe(900)
+  })
+
   it('starts without Niko feedback messages', () => {
     const initial = createInitialGameState('formal', 1_000)
 
@@ -43,6 +64,19 @@ describe('gameReducer', () => {
     const initial = createInitialGameState('quick', 1_000)
 
     expect(initial.chats).toHaveLength(0)
+  })
+
+  it('keeps one candidate display order stable through interactions', () => {
+    const initial = createInitialGameState('quick', 1_000)
+    const order = initial.candidateDisplayOrder
+    const selected = gameReducer(initial, {
+      type: 'SELECT_CANDIDATE',
+      candidateId: 'B',
+      nowMs: 2_000,
+    })
+
+    expect(order.slice().sort()).toEqual(['A', 'B', 'C', 'D', 'E'])
+    expect(selected.candidateDisplayOrder).toEqual(order)
   })
 
   it('spends one point for shallow evidence and never unlocks it twice', () => {

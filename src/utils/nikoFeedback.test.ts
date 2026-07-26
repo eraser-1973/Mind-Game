@@ -11,7 +11,7 @@ const runtimeWithRatings = (
   t1: number,
   t2?: number,
 ): CandidateRuntimeState => ({
-  candidateId: 'C',
+  candidateId: 'B',
   ratings: {
     T1: { value: t1, elapsedSec: 10 },
     ...(t2 === undefined
@@ -42,9 +42,9 @@ describe('Niko feedback', () => {
     expect(getNikoMood('negative', 'higher')).toBe('angry')
   })
 
-  it('uses T1 as the T2 baseline and references positive evidence', () => {
+  it('uses T1 as the T2 baseline and references the new B material packet', () => {
     const message = createNikoFeedback({
-      candidate: candidateById.C,
+      candidate: candidateById.B,
       runtime: runtimeWithRatings(50),
       stage: 'T2',
       value: 70,
@@ -52,8 +52,8 @@ describe('Niko feedback', () => {
     })
 
     expect(message?.mood).toBe('happy')
-    expect(message?.relatedEvidenceId).toBe('C-shallow')
-    expect(message?.text).toContain('过程记录完整')
+    expect(message?.relatedEvidenceId).toBe('B-t2-1')
+    expect(message?.text).toContain('调研报告与数据文件')
   })
 
   it('uses T2 as the T3 baseline and rewards lowering on negative evidence', () => {
@@ -69,13 +69,13 @@ describe('Niko feedback', () => {
     })
 
     expect(message?.mood).toBe('happy')
-    expect(message?.relatedEvidenceId).toBe('A-deep')
-    expect(message?.text).toContain('代码来源核验')
+    expect(message?.relatedEvidenceId).toBe('A-t3-1')
+    expect(message?.text).toContain('竞赛分工与团队反馈')
   })
 
   it('does not generate feedback when the score matches its baseline', () => {
     const message = createNikoFeedback({
-      candidate: candidateById.C,
+      candidate: candidateById.B,
       runtime: runtimeWithRatings(50),
       stage: 'T2',
       value: 50,

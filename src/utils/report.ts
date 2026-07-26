@@ -9,16 +9,20 @@ import {
   detectAttentionDisengagementFailure,
 } from './scoring'
 
-const getRevisionQuality = (
+export const calculateRevisionQuality = (
   revisions: ReportData['revisions'],
 ): number => {
   const scored = revisions
     .filter((item) => item.result !== null)
     .map(({ candidate, result }) => {
       if (!result) return 50
-      const usefulDirection = candidate.isToxic
-        ? -result.delta
-        : result.delta
+      if (candidate.expectedUpdate === 'stable') {
+        return Math.max(0, Math.min(100, 100 - Math.abs(result.delta) * 8))
+      }
+      const usefulDirection =
+        candidate.expectedUpdate === 'down'
+          ? -result.delta
+          : result.delta
       return Math.max(0, Math.min(100, 50 + usefulDirection * 2))
     })
   if (scored.length === 0) return 50
@@ -39,7 +43,7 @@ export function generateReport(state: GameState): ReportData {
   }))
   const attention = detectAttentionDisengagementFailure(state.logs)
   const strategy = classifyStrategy(state.logs)
-  const revisionQuality = getRevisionQuality(revisions)
+  const revisionQuality = calculateRevisionQuality(revisions)
   const rdi = calculateRDI({
     selectedAbility: selectedCandidate.trueAbility,
     selectedFit: selectedCandidate.trueFit,
@@ -70,5 +74,8 @@ export function generateReport(state: GameState): ReportData {
     logs: state.logs,
     runtime: state.runtime,
     sunkCostChoice: state.sunkCostChoice,
+    participantId: state.participantId,
+    researchData: state.researchData,
+    nikoMessages: state.nikoMessages,
   }
 }

@@ -42,7 +42,7 @@ const buildReport = () => {
 }
 
 describe('ReportScreen', () => {
-  it('keeps restart action while removing the export json action', () => {
+  it('keeps restart action and exposes JSON export for anonymous data', () => {
     const html = renderToStaticMarkup(
       <ReportScreen
         report={buildReport()}
@@ -51,6 +51,8 @@ describe('ReportScreen', () => {
     )
 
     expect(html).toContain('重新开始')
-    expect(html).not.toContain('导出 JSON 数据')
+    expect(html).toContain('导出 JSON 数据')
+    expect(html).toContain('岗位匹配基准分')
+    expect(html).toContain('数据整理与基础分析能力')
   })
 })

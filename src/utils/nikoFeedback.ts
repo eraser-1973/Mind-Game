@@ -86,7 +86,10 @@ export const createNikoFeedback = ({
   if (!direction) return null
 
   const evidence =
-    stage === 'T2' ? candidate.shallowEvidence : candidate.deepEvidence
+    stage === 'T2'
+      ? candidate.shallowEvidence[0]
+      : candidate.deepEvidence[0]
+  if (!evidence) return null
   const mood = getNikoMood(evidence.polarity, direction)
 
   return {

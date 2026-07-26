@@ -1,4 +1,5 @@
 import type { GameMode } from '../types/game'
+import { AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF } from '../data/candidates'
 import { RecruitmentCabin3D } from './RecruitmentCabin3D'
 
 type Props = {
@@ -16,7 +17,7 @@ export function StartScreen({ onStart }: Props) {
           <span>招聘模拟舱</span>
         </h1>
         <p className="start-card__lead">
-          你有有限的时间和 5 点查证资源。完成五人初评、识别证据质量，并在压力升级前给出最终录用决定。
+          目标岗位：{AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF.title}。你有有限的时间和 5 点查证资源；完成五人初评、识别证据质量，并在压力升级前给出最终录用决定。
         </p>
         <div className="mission-grid">
           <article>
@@ -33,6 +34,22 @@ export function StartScreen({ onStart }: Props) {
           </article>
         </div>
         <div className="briefing">
+          <h2>岗位背景</h2>
+          <p>{AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF.background}</p>
+          <h2>岗位职责</h2>
+          <ol>
+            {AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF.responsibilities.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ol>
+          <h2>任职要求</h2>
+          <ol>
+            {AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF.requirements.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ol>
+          <h2>玩家任务</h2>
+          <p>{AI_ASSESSMENT_PRODUCT_ASSISTANT_BRIEF.playerTask}</p>
           <h2>行动规则</h2>
           <ol>
             <li>先完成 5 名候选人的 T1 独立初评。</li>
