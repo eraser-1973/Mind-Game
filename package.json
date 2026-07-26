@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.2 seconds
+Output:
 {
   "name": "pressure-talent-recruitment-cabin",
   "private": true,
@@ -19,7 +22,8 @@
     "@types/react-dom": "^18.3.0",
     "playwright-core": "^1.60.0",
     "typescript": "^5.5.4",
-    "vite": "^5.4.2",
-    "vitest": "^2.0.5"
+    "vite": "^6.4.3",
+    "vitest": "^3.2.7"
   }
 }
+
