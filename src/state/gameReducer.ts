@@ -356,7 +356,7 @@ export function gameReducer(
       addedAfterNegative,
     })
     const warningChat =
-      addedAfterNegative && candidate.isToxic
+      state.mode === 'quick' && addedAfterNegative && candidate.isToxic
         ? {
             id: `chat-${state.chats.length + 1}`,
             sender: (state.chats.length % 2 ? '李姐' : '小张') as

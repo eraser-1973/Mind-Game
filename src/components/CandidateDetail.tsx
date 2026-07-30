@@ -1,6 +1,7 @@
 import type {
   Candidate,
   CandidateRuntimeState,
+  GameMode,
   RatingStage,
   VerifyType,
 } from '../types/game'
@@ -12,6 +13,7 @@ type Props = {
   runtime: CandidateRuntimeState
   availablePoints: number
   investigationLocked: boolean
+  mode: GameMode
   pendingVerifyType?: VerifyType | null
   onVerify: (type: VerifyType) => void
   onRate: (stage: RatingStage, value: number) => void
@@ -23,6 +25,7 @@ export function CandidateDetail({
   runtime,
   availablePoints,
   investigationLocked,
+  mode,
   pendingVerifyType,
   onVerify,
   onRate,
@@ -86,14 +89,14 @@ export function CandidateDetail({
             </div>
           </div>
           {runtime.shallowUnlocked && candidate.shallowEvidence.map((evidence, index) => (
-            <article key={evidence.id} className={'evidence-card ' + (evidence.isNegative ? 'is-negative' : 'is-positive')}>
+            <article key={evidence.id} className={'evidence-card ' + (mode === 'quick' ? (evidence.isNegative ? 'is-negative' : 'is-positive') : '')}>
               <span>T2 浅度查证 · 材料 {index + 1}</span>
               <strong>{evidence.title}</strong>
               <p>{evidence.content}</p>
             </article>
           ))}
           {runtime.deepUnlocked && candidate.deepEvidence.map((evidence, index) => (
-            <article key={evidence.id} className={'evidence-card ' + (evidence.isNegative ? 'is-negative' : 'is-positive')}>
+            <article key={evidence.id} className={'evidence-card ' + (mode === 'quick' ? (evidence.isNegative ? 'is-negative' : 'is-positive') : '')}>
               <span>T3 深度查证 · 材料 {index + 1}</span>
               <strong>{evidence.title}</strong>
               <p>{evidence.content}</p>

@@ -75,7 +75,7 @@ export function GameScreen({
 
   const initialRatingsComplete = allT1Rated(state)
   const showNikoFeedback =
-    mode === 'formal' && initialRatingsComplete
+    mode === 'quick' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]
   const orderedCandidates = state.candidateDisplayOrder
     .map((candidateId) => candidateById[candidateId])
@@ -161,6 +161,7 @@ export function GameScreen({
           runtime={state.runtime[selected.id]}
           availablePoints={state.availablePoints}
           investigationLocked={!initialRatingsComplete}
+          mode={state.mode}
           pendingVerifyType={pendingVerifyType}
           onVerify={(verifyType) => verify(selected.id, verifyType)}
           onRate={(stage, value) =>

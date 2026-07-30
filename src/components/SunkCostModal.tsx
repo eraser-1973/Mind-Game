@@ -31,7 +31,7 @@ export function SunkCostModal({
             <strong>追加验证</strong>
             <span>维持原方向，承担继续投入的心理成本</span>
           </button>
-          <button className="is-recommended" onClick={() => onChoose('stop_loss')}>
+          <button onClick={() => onChoose('stop_loss')}>
             <strong>立即止损</strong>
             <span>把已投入资源视为不可追回，转向比较</span>
           </button>

@@ -1105,9 +1105,14 @@ p {
   gap: 0.35rem;
   padding: 0.9rem 1rem;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--green);
-  background: rgba(85, 223, 154, 0.05);
-}
+    border-left: 3px solid var(--cyan);
+    background: rgba(99, 221, 255, 0.05);
+  }
+
+  .evidence-card.is-positive {
+    border-left-color: var(--green);
+    background: rgba(85, 223, 154, 0.05);
+  }
 
 .evidence-card.is-negative {
   border-left-color: var(--red);
@@ -1521,8 +1526,7 @@ p {
   cursor: pointer;
 }
 
-.modal-choice-grid button:hover,
-.modal-choice-grid button.is-recommended {
+.modal-choice-grid button:hover {
   border-color: rgba(99, 221, 255, 0.42);
   background: rgba(40, 145, 184, 0.09);
 }

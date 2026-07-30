@@ -26,6 +26,7 @@ describe('CandidateDetail evidence packets', () => {
         runtime={runtime}
         availablePoints={4}
         investigationLocked={false}
+        mode="quick"
         onVerify={() => undefined}
         onRate={() => undefined}
       />,
@@ -33,5 +34,22 @@ describe('CandidateDetail evidence packets', () => {
 
     expect(html).toContain('调研报告与数据文件')
     expect(html).toContain('实习证明与工作记录')
+  })
+
+  it('uses neutral evidence cards in formal mode', () => {
+    const html = renderToStaticMarkup(
+      <CandidateDetail
+        candidate={candidateById.B}
+        runtime={runtime}
+        availablePoints={4}
+        investigationLocked={false}
+        mode="formal"
+        onVerify={() => undefined}
+        onRate={() => undefined}
+      />,
+    )
+
+    expect(html).not.toContain('is-positive')
+    expect(html).not.toContain('is-negative')
   })
 })

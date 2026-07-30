@@ -108,7 +108,7 @@ describe('GameScreen current task copy', () => {
     )
   })
 
-  it('shows Niko only in the formal second stage and preserves the HR panel', () => {
+  it('keeps evaluative Niko feedback out of the formal second stage', () => {
     mockState.setState?.(true, 'formal')
     const formal = renderToStaticMarkup(
       <GameScreen mode="formal" onRestart={() => undefined} />,
@@ -120,8 +120,8 @@ describe('GameScreen current task copy', () => {
     )
 
     expect(formal).toContain('HRChatPanel')
-    expect(formal).toContain('NikoChatPanel')
+    expect(formal).not.toContain('NikoChatPanel')
     expect(quick).toContain('HRChatPanel')
-    expect(quick).not.toContain('NikoChatPanel')
+    expect(quick).toContain('NikoChatPanel')
   })
 })
