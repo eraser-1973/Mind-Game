@@ -1,7 +1,7 @@
 import type { FormalOutboxItem } from '../persistence/formalSessionStore'
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } }
-export type SessionCredentials = { sessionId: string; recoveryToken: string; participantId: string }
+export type SessionCredentials = { sessionId: string; recoveryToken: string; participantId: string; serverTime?: string }
 
 const call = async <T>(path: string, init: RequestInit = {}, token?: string): Promise<T> => {
   const response = await fetch(path, {

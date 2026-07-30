@@ -24,7 +24,7 @@ export function SunkCostModal({
         <h2 id="sunk-title">资源投入正在影响判断</h2>
         <p>
           你已经在 <strong>{candidateName}</strong> 身上投入 {spentPoints} 点查证资源，
-          但证据仍存在明显风险。王总要求你立刻决定下一步。
+          当前可用资源和决策时间都在减少。王总要求你立刻决定下一步。
         </p>
         <div className="modal-choice-grid">
           <button onClick={() => onChoose('continue')}>

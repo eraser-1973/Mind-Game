@@ -16,6 +16,35 @@
     npm test -- --run
     npm run typecheck
     npm run build
+    npx playwright test
+
+## 正式实验后台与本地开发
+
+正式模式使用同源 Cloudflare Worker API、D1 数据库和浏览器 IndexedDB outbox。快速模式不会创建正式实验会话，也不会写入正式实验数据库。
+
+首次配置 Cloudflare：
+
+    npx wrangler login
+    npx wrangler d1 create mind-game-formal
+
+将命令返回的 `database_id` 填入 `wrangler.jsonc` 的 `DB` 绑定，然后执行：
+
+    npx wrangler d1 migrations apply mind-game-formal --local
+    npx wrangler d1 migrations apply mind-game-formal --remote
+
+运行包含本地 Worker 与 D1 的完整应用：
+
+    npm run build
+    npx wrangler dev
+
+只调试不需要正式 API 的快速模式时，仍可使用 `npm run dev`。
+
+部署：
+
+    npm run build
+    npx wrangler deploy
+
+正式会话每 30 秒更新心跳。会话保持 `in_progress` 且超过 30 分钟没有心跳、也没有完成记录时，恢复接口会将其标记为 `abandoned`。研究者也可在 D1 中用同一规则筛选长期未完成记录。应用代码不会把请求 IP、姓名、手机号、邮箱或学号写入实验表。
 
 ## 快速完整流程
 

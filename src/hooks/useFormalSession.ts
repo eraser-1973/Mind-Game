@@ -87,6 +87,10 @@ export function useFormalSession() {
         snapshot.gameState.invalidForAssessment = true
         snapshot.gameState.invalidReason ??= '会话曾发生严重技术错误。'
       }
+      if (typeof remote.serverTime === 'string') {
+        snapshot.serverTimeReference = remote.serverTime
+        credentialsRef.current = { ...credentialsRef.current!, serverTime: remote.serverTime }
+      }
       snapshot.gameState?.ratingEvents.forEach((event) => seenEventsRef.current.add(event.eventId))
       snapshot.gameState?.evidenceEvents.forEach((event) => seenEventsRef.current.add(event.eventId))
       setStatus('active')
@@ -113,6 +117,7 @@ export function useFormalSession() {
       ...credentials, ...input, savedAt: new Date().toISOString(),
       technicalPauseStartedAt: input.gameState?.technicalPauseStartedAt ?? null,
       accumulatedTechnicalPauseMs: input.gameState?.technicalPauseMs ?? 0,
+      serverTimeReference: credentials.serverTime,
     }
     await getStore().saveSnapshot(snapshot)
     const gameEvents = [...(input.gameState?.evidenceEvents ?? []), ...(input.gameState?.ratingEvents ?? [])]

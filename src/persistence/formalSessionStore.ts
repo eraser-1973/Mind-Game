@@ -12,6 +12,7 @@ export type FormalSessionSnapshot = {
   savedAt: string
   technicalPauseStartedAt: string | null
   accumulatedTechnicalPauseMs: number
+  serverTimeReference?: string
 }
 export type FormalOutboxItem = {
   eventId: string
@@ -76,7 +77,7 @@ export class IndexedDbFormalSessionStore implements FormalSessionStore {
   async deleteOutbox(id: string) { await requestResult((await this.store('outbox', 'readwrite')).delete(id)) }
 }
 
-export const saveRecoveryPointer = (value: FormalRecoveryPointer) => localStorage.setItem(modePolicies.formal.localStorageKey, JSON.stringify(value))
+export const saveRecoveryPointer = (value: FormalRecoveryPointer) => localStorage.setItem(modePolicies.formal.localStorageKey, JSON.stringify({ sessionId: value.sessionId, recoveryToken: value.recoveryToken }))
 export const loadRecoveryPointer = (): FormalRecoveryPointer | null => {
   try { return JSON.parse(localStorage.getItem(modePolicies.formal.localStorageKey) ?? 'null') as FormalRecoveryPointer | null } catch { return null }
 }

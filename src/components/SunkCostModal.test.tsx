@@ -12,5 +12,6 @@ describe('SunkCostModal', () => {
     expect(html).toContain('立即止损')
     expect(html).toContain('放弃本轮补录')
     expect(html).not.toMatch(/button--primary|button--danger|is-recommended/)
+    expect(html).not.toContain('明显风险')
   })
 })
