@@ -4,6 +4,13 @@ export type PressureStage = 'green' | 'orange' | 'red'
 export type SunkCostChoice = 'continue' | 'stop_loss' | 'give_up' | null
 export type GamePhase = 'start' | 'playing' | 'decision' | 'report'
 export type GameMode = 'formal' | 'quick'
+export type SessionStatus =
+  | 'in_progress'
+  | 'completed'
+  | 'abandoned'
+  | 'technical_error'
+export type SubmissionType = 'manual' | 'timeout' | 'timeout_auto'
+export type PersistedStage = RatingStage | 'FINAL'
 export type EvidencePolarity = 'positive' | 'negative'
 export type RatingDirection = 'higher' | 'lower'
 export type NikoMood = 'happy' | 'angry'
@@ -195,6 +202,126 @@ export type ResearchData = {
   startedAt: string
   completedAt: string | null
 }
+
+export type StageSnapshot = {
+  eventId: string
+  sessionId: string
+  stage: PersistedStage
+  preferredCandidateId: string | null
+  confidence: number | null
+  submittedAt: string
+}
+
+export type RatingEvent = {
+  eventId: string
+  sessionId: string
+  candidateId: string
+  stage: RatingStage
+  score: number
+  relatedEvidenceIds: string[]
+  submittedAt: string
+  elapsedSec: number
+}
+
+export type EvidenceEvent = {
+  eventId: string
+  sessionId: string
+  candidateId: string
+  evidenceId: string
+  verifyType: VerifyType
+  evidencePolarity: EvidencePolarity
+  viewedAt: string
+  elapsedSec: number
+  pointsBefore: number
+  pointsCost: number
+  pointsAfter: number
+  riskEvidenceSeenBefore: boolean
+  addedAfterRiskEvidence: boolean
+  cumulativeAddedAfterRiskEvidence: number
+}
+
+export type SunkCostEvent = {
+  eventId: string
+  sessionId: string
+  choice: Exclude<SunkCostChoice, null>
+  selectedAt: string
+  elapsedSec: number
+  pointsSpentBeforeChoice: number
+  preferredCandidateId: string | null
+  confidence: number | null
+  additionalPointsAfterChoice: number
+  candidateSwitchesAfterChoice: number
+  ratingChangesAfterChoice: number
+  finalCandidateId: string | null
+  finalConfidence: number | null
+  secondsToFinalSubmission: number | null
+}
+
+export type FinalDecision = {
+  eventId: string
+  sessionId: string
+  candidateId: string | null
+  confidence: number | null
+  submissionType: SubmissionType
+  submittedAt: string
+  elapsedSec: number
+}
+
+export type ClientError = {
+  errorId: string
+  sessionId: string | null
+  errorType: 'window_error' | 'unhandled_rejection' | 'react_boundary' | 'api' | 'restore' | 'resource'
+  message: string
+  stack: string | null
+  route: string
+  occurredAt: string
+  appVersion: string
+  fatal: boolean
+  affectedAssessment: boolean
+}
+
+export type PendingUpload = {
+  eventId: string
+  kind: 'event_batch' | 'stage_snapshot' | 'session_patch' | 'completion' | 'client_error'
+  payload: unknown
+  queuedAt: string
+  attempts: number
+}
+
+type PersistedSessionBase = {
+  schemaVersion: number
+  appVersion: string
+  sessionId: string
+  status: SessionStatus
+  startedAt: string
+  updatedAt: string
+  lastHeartbeatAt: string
+  completedAt: string | null
+  submissionTrigger: SubmissionType | null
+  invalidForAssessment: boolean
+  invalidReason: string | null
+  gameState: GameState | null
+}
+
+export type FormalPersistedSession = PersistedSessionBase & {
+  mode: 'formal'
+  participantId: string
+  researchData: ResearchData
+  stageSnapshots: StageSnapshot[]
+  ratingEvents: RatingEvent[]
+  evidenceEvents: EvidenceEvent[]
+  sunkCostEvents: SunkCostEvent[]
+  finalDecision: FinalDecision | null
+  clientErrors: ClientError[]
+  pendingUploads: PendingUpload[]
+}
+
+export type QuickPersistedSession = PersistedSessionBase & {
+  mode: 'quick'
+  trainingEvents: GameLog[]
+}
+
+export type PersistedSession = FormalPersistedSession | QuickPersistedSession
 
 export type GameState = {
   phase: GamePhase
