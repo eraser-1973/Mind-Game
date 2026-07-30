@@ -85,6 +85,16 @@ export function useFormalSession() {
         : { ...event, score: event.score }
       await getOutbox().enqueue({ eventId: event.eventId, sessionId: credentials.sessionId, kind: 'events', payload: { events: [{ eventId: event.eventId, eventType, candidateId: event.candidateId, stage: 'stage' in event ? event.stage : null, occurredAt: 'viewedAt' in event ? event.viewedAt : event.submittedAt, elapsedSec: event.elapsedSec, payload }] }, queuedAt: new Date().toISOString(), attempts: 0 })
     }
+    for (const snapshot of input.gameState?.stageSnapshots ?? []) {
+      if (seenEventsRef.current.has(snapshot.eventId)) continue
+      seenEventsRef.current.add(snapshot.eventId)
+      await getOutbox().enqueue({ eventId: snapshot.eventId, sessionId: credentials.sessionId, kind: 'snapshots', payload: { snapshots: [{ ...snapshot, snapshotId: snapshot.eventId }] }, queuedAt: new Date().toISOString(), attempts: 0 })
+    }
+    for (const event of input.gameState?.sunkCostEvents ?? []) {
+      if (seenEventsRef.current.has(event.eventId)) continue
+      seenEventsRef.current.add(event.eventId)
+      await getOutbox().enqueue({ eventId: event.eventId, sessionId: credentials.sessionId, kind: 'events', payload: { events: [{ eventId: event.eventId, eventType: 'sunk_cost', occurredAt: event.selectedAt, elapsedSec: event.elapsedSec, payload: event }] }, queuedAt: new Date().toISOString(), attempts: 0 })
+    }
     void getOutbox().flush(credentials.sessionId)
   }, [])
 

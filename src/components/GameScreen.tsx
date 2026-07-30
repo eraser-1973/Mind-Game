@@ -23,6 +23,7 @@ import { NikoChatPanel } from './NikoChatPanel'
 import { ReportScreen } from './ReportScreen'
 import { SunkCostModal } from './SunkCostModal'
 import { TimerBar } from './TimerBar'
+import { StageSnapshotModal } from './StageSnapshotModal'
 
 type Props = {
   mode: GameMode
@@ -80,6 +81,7 @@ export function GameScreen({
   }, [state.phase])
 
   const initialRatingsComplete = allT1Rated(state)
+  const missingT1Snapshot = initialRatingsComplete && !state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1')
   const showNikoFeedback =
     mode === 'quick' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]
@@ -166,7 +168,7 @@ export function GameScreen({
           candidate={selected}
           runtime={state.runtime[selected.id]}
           availablePoints={state.availablePoints}
-          investigationLocked={!initialRatingsComplete}
+          investigationLocked={!initialRatingsComplete || missingT1Snapshot}
           mode={state.mode}
           pendingVerifyType={pendingVerifyType}
           onVerify={(verifyType) => verify(selected.id, verifyType)}
@@ -240,7 +242,7 @@ export function GameScreen({
           candidateName={toxicFocus.name}
           spentPoints={state.runtime[toxicFocus.id].spentPoints}
           onChoose={(choice) =>
-            dispatch({ type: 'SUNK_COST_CHOICE', choice })
+            dispatch({ type: 'SUNK_COST_CHOICE', choice, eventId: createSessionEventId(), occurredAt: new Date().toISOString() })
           }
         />
       )}
@@ -250,10 +252,14 @@ export function GameScreen({
           candidates={orderedCandidates}
           runtime={state.runtime}
           timeExpired={state.timeLeftSec === 0}
-          onSelect={(candidateId) =>
+          onSelect={(candidateId, confidence) =>
             dispatch({
               type: 'FINAL_SELECT',
               candidateId,
+              confidence,
+              submissionType: state.timeLeftSec === 0 ? 'timeout_confirmed' : 'manual',
+              eventId: createSessionEventId(),
+              occurredAt: new Date().toISOString(),
               nowMs: Date.now(),
             })
           }
@@ -262,6 +268,14 @@ export function GameScreen({
               dispatch({ type: 'RESUME_PLAYING' })
             }
           }}
+        />
+      )}
+
+      {(missingT1Snapshot || state.pendingSnapshotStage) && (
+        <StageSnapshotModal
+          stage={missingT1Snapshot ? 'T1' : state.pendingSnapshotStage!}
+          candidates={orderedCandidates}
+          onSubmit={(candidateId, confidence) => dispatch({ type: 'CAPTURE_STAGE_SNAPSHOT', stage: missingT1Snapshot ? 'T1' : state.pendingSnapshotStage!, preferredCandidateId: candidateId, confidence, eventId: createSessionEventId(), occurredAt: new Date().toISOString() })}
         />
       )}
     </main>

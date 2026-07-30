@@ -9,7 +9,7 @@ export type SessionStatus =
   | 'completed'
   | 'abandoned'
   | 'technical_error'
-export type SubmissionType = 'manual' | 'timeout' | 'timeout_auto'
+export type SubmissionType = 'manual' | 'timeout_confirmed' | 'timeout_auto'
 export type PersistedStage = RatingStage | 'FINAL'
 export type EvidencePolarity = 'positive' | 'negative'
 export type RatingDirection = 'higher' | 'lower'
@@ -239,6 +239,9 @@ export type EvidenceEvent = {
   riskEvidenceSeenBefore: boolean
   addedAfterRiskEvidence: boolean
   cumulativeAddedAfterRiskEvidence: number
+  additionalPointsThisEvent: number
+  cumulativeAdditionalPointsAfterRisk: number
+  riskEvidenceIdsPreviouslySeen: string[]
 }
 
 export type SunkCostEvent = {
@@ -248,14 +251,17 @@ export type SunkCostEvent = {
   selectedAt: string
   elapsedSec: number
   pointsSpentBeforeChoice: number
-  preferredCandidateId: string | null
-  confidence: number | null
-  additionalPointsAfterChoice: number
-  candidateSwitchesAfterChoice: number
-  ratingChangesAfterChoice: number
+  availablePointsBeforeChoice: number
+  preferredCandidateIdAtChoice: string | null
+  confidenceAtChoice: number | null
+  toxicCandidateId: string | null
+  toxicCandidatePoints: number
+  subsequentAdditionalPoints: number
+  subsequentCandidateSwitches: number
+  subsequentRatingChanges: number
   finalCandidateId: string | null
   finalConfidence: number | null
-  secondsToFinalSubmission: number | null
+  secondsFromChoiceToFinal: number | null
 }
 
 export type FinalDecision = {
@@ -266,6 +272,8 @@ export type FinalDecision = {
   submissionType: SubmissionType
   submittedAt: string
   elapsedSec: number
+  currentStage: PersistedStage
+  timeoutSource: 'timer' | null
 }
 
 export type ClientError = {
@@ -349,6 +357,9 @@ export type GameState = {
   stageSnapshots: StageSnapshot[]
   ratingEvents: RatingEvent[]
   evidenceEvents: EvidenceEvent[]
+  sunkCostEvents: SunkCostEvent[]
+  finalDecision: FinalDecision | null
+  pendingSnapshotStage: RatingStage | null
 }
 
 export type ROIResult = {

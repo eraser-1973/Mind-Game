@@ -249,4 +249,40 @@ describe('gameReducer', () => {
 
     expect(state.phase).toBe('playing')
   })
+
+  it('captures a T1 preference snapshot with explicit confidence', () => {
+    const state = gameReducer(createInitialGameState('formal', 1_000), {
+      type: 'CAPTURE_STAGE_SNAPSHOT', stage: 'T1', preferredCandidateId: 'B', confidence: 78,
+      eventId: 'snapshot-t1', occurredAt: '2026-07-30T00:01:00.000Z',
+    })
+    expect(state.stageSnapshots[0]).toMatchObject({ stage: 'T1', preferredCandidateId: 'B', confidence: 78 })
+  })
+
+  it('distinguishes manual and timeout-confirmed final decisions', () => {
+    const initial = createInitialGameState('formal', 1_000)
+    const manual = gameReducer(initial, { type: 'FINAL_SELECT', candidateId: 'B', confidence: 82, submissionType: 'manual', nowMs: 2_000, eventId: 'final-manual', occurredAt: '2026-07-30T00:10:00.000Z' })
+    const timeout = gameReducer(initial, { type: 'FINAL_SELECT', candidateId: 'D', confidence: 61, submissionType: 'timeout_confirmed', nowMs: 2_000, eventId: 'final-timeout', occurredAt: '2026-07-30T00:15:00.000Z' })
+    expect(manual.finalDecision?.submissionType).toBe('manual')
+    expect(timeout.finalDecision?.submissionType).toBe('timeout_confirmed')
+    expect(timeout.stageSnapshots.at(-1)?.stage).toBe('FINAL')
+  })
+
+  it('updates structured sunk-cost behavior after the choice', () => {
+    let state = createInitialGameState('formal', 1_000)
+    state = gameReducer(state, { type: 'VERIFY', candidateId: 'A', verifyType: 'shallow', eventId: 'verify-risk-a', occurredAt: '2026-07-30T00:01:00.000Z' })
+    state = gameReducer(state, { type: 'SUNK_COST_CHOICE', choice: 'continue', eventId: 'sunk-1', occurredAt: '2026-07-30T00:02:00.000Z' })
+    state = gameReducer(state, { type: 'VERIFY', candidateId: 'A', verifyType: 'deep', eventId: 'verify-after-a', occurredAt: '2026-07-30T00:03:00.000Z' })
+    state = gameReducer(state, { type: 'SELECT_CANDIDATE', candidateId: 'B', nowMs: 4_000 })
+    expect(state.sunkCostEvents[0]).toMatchObject({ choice: 'continue', subsequentAdditionalPoints: 3, subsequentCandidateSwitches: 1 })
+  })
+
+  it.each(['A', 'C'])('tracks actual risk evidence ids before later investment for %s', (candidateId) => {
+    let state = createInitialGameState('formal', 1_000)
+    state = gameReducer(state, { type: 'VERIFY', candidateId, verifyType: 'shallow', eventId: `risk-${candidateId}`, occurredAt: '2026-07-30T00:01:00.000Z' })
+    state = gameReducer(state, { type: 'VERIFY', candidateId, verifyType: 'deep', eventId: `after-${candidateId}`, occurredAt: '2026-07-30T00:02:00.000Z' })
+    const event = state.evidenceEvents.at(-1)
+    expect(event?.addedAfterRiskEvidence).toBe(true)
+    expect(event?.riskEvidenceIdsPreviouslySeen.length).toBeGreaterThan(0)
+    expect(event?.additionalPointsThisEvent).toBe(3)
+  })
 })

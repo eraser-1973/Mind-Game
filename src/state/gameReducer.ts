@@ -7,6 +7,11 @@ import type {
   NikoMessage,
   RatingEvent,
   EvidenceEvent,
+  FinalDecision,
+  PersistedStage,
+  StageSnapshot,
+  SubmissionType,
+  SunkCostEvent,
   PressureStage,
   RatingStage,
   ResearchData,
@@ -43,10 +48,11 @@ export type GameAction =
       occurredAt?: string
     }
   | { type: 'TICK'; deltaSec: number }
-  | { type: 'SUNK_COST_CHOICE'; choice: Exclude<SunkCostChoice, null> }
+  | { type: 'SUNK_COST_CHOICE'; choice: Exclude<SunkCostChoice, null>; eventId?: string; occurredAt?: string }
+  | { type: 'CAPTURE_STAGE_SNAPSHOT'; stage: PersistedStage; preferredCandidateId: string; confidence: number; eventId?: string; occurredAt?: string }
   | { type: 'OPEN_DECISION' }
   | { type: 'RESUME_PLAYING' }
-  | { type: 'FINAL_SELECT'; candidateId: string; nowMs: number }
+  | { type: 'FINAL_SELECT'; candidateId: string; confidence?: number; submissionType?: SubmissionType; nowMs: number; eventId?: string; occurredAt?: string }
   | { type: 'DISMISS_NOTICE' }
   | { type: 'NIKO_FEEDBACK'; message: NikoMessage }
 
@@ -107,8 +113,16 @@ export function createInitialGameState(
     stageSnapshots: [],
     ratingEvents: [],
     evidenceEvents: [],
+    sunkCostEvents: [],
+    finalDecision: null,
+    pendingSnapshotStage: null,
   }
 }
+
+const updateLatestSunkCost = (
+  events: SunkCostEvent[],
+  updater: (event: SunkCostEvent) => SunkCostEvent,
+) => events.map((event, index) => index === events.length - 1 ? updater(event) : event)
 
 const clampRating = (value: number) =>
   Math.max(0, Math.min(100, Math.round(value)))
@@ -164,6 +178,24 @@ export function gameReducer(
   state: GameState,
   action: GameAction,
 ): GameState {
+  if (action.type === 'CAPTURE_STAGE_SNAPSHOT') {
+    if (!candidateById[action.preferredCandidateId]) return state
+    const snapshot: StageSnapshot = {
+      eventId: action.eventId ?? `snapshot-${state.sessionId}-${action.stage}`,
+      sessionId: state.sessionId,
+      stage: action.stage,
+      preferredCandidateId: action.preferredCandidateId,
+      confidence: clampRating(action.confidence),
+      submittedAt: action.occurredAt ?? new Date().toISOString(),
+    }
+    return {
+      ...state,
+      stageSnapshots: [...state.stageSnapshots.filter((item) => item.stage !== action.stage), snapshot],
+      pendingSnapshotStage: null,
+      phase: action.stage === 'T2' || action.stage === 'T3' ? 'decision' : state.phase,
+    }
+  }
+
   if (action.type === 'NIKO_FEEDBACK') {
     const existingIndex = state.nikoMessages.findIndex(
       (message) => message.id === action.message.id,
@@ -223,6 +255,7 @@ export function gameReducer(
     return {
       ...settled,
       selectedCandidateId: action.candidateId,
+      sunkCostEvents: updateLatestSunkCost(settled.sunkCostEvents, (event) => ({ ...event, subsequentCandidateSwitches: event.subsequentCandidateSwitches + 1 })),
       logs: [...settled.logs, log],
       lastActionElapsedSec: settled.elapsedSec,
       notice: null,
@@ -278,6 +311,7 @@ export function gameReducer(
       },
       logs: [...state.logs, log],
       ratingEvents: [...state.ratingEvents, ratingEvent],
+      sunkCostEvents: updateLatestSunkCost(state.sunkCostEvents, (event) => ({ ...event, subsequentRatingChanges: event.subsequentRatingChanges + 1 })),
       lastActionElapsedSec: state.elapsedSec,
       notice: `${action.stage} 评分已封存；后续重评不会显示这次分数。`,
     }
@@ -395,6 +429,12 @@ export function gameReducer(
           )
           .reduce((total, event) => total + event.pointsCost, 0) +
         (addedAfterNegative && candidate.isToxic ? cost : 0),
+      additionalPointsThisEvent: addedAfterNegative ? cost : 0,
+      cumulativeAdditionalPointsAfterRisk:
+        state.evidenceEvents.filter((event) => event.candidateId === action.candidateId && event.addedAfterRiskEvidence).reduce((total, event) => total + event.pointsCost, 0) + (addedAfterNegative ? cost : 0),
+      riskEvidenceIdsPreviouslySeen: runtime.viewedEvidenceIds.filter((id) =>
+        [...candidate.shallowEvidence, ...candidate.deepEvidence].some((evidence) => evidence.id === id && evidence.polarity === 'negative'),
+      ),
     }
 
     return {
@@ -406,6 +446,7 @@ export function gameReducer(
       },
       logs: [...state.logs, log],
       evidenceEvents: [...state.evidenceEvents, evidenceEvent],
+      sunkCostEvents: updateLatestSunkCost(state.sunkCostEvents, (event) => ({ ...event, subsequentAdditionalPoints: event.subsequentAdditionalPoints + cost })),
       chats: warningChat
         ? [...state.chats, warningChat]
         : state.chats,
@@ -426,12 +467,24 @@ export function gameReducer(
       type: 'sunk_cost',
       detail: `沉没成本选择：${labels[action.choice]}`,
     })
+    const latest = state.stageSnapshots.at(-1)
+    const toxic = candidates.filter((candidate) => candidate.isToxic).sort((a, b) => state.runtime[b.id].spentPoints - state.runtime[a.id].spentPoints)[0]
+    const sunkEvent: SunkCostEvent = {
+      eventId: action.eventId ?? `sunk-${state.sessionId}-${state.sunkCostEvents.length + 1}`, sessionId: state.sessionId,
+      choice: action.choice, selectedAt: action.occurredAt ?? new Date().toISOString(), elapsedSec: state.elapsedSec,
+      pointsSpentBeforeChoice: 5 - state.availablePoints, availablePointsBeforeChoice: state.availablePoints,
+      preferredCandidateIdAtChoice: latest?.preferredCandidateId ?? state.selectedCandidateId, confidenceAtChoice: latest?.confidence ?? null,
+      toxicCandidateId: toxic?.id ?? null, toxicCandidatePoints: toxic ? state.runtime[toxic.id].spentPoints : 0,
+      subsequentAdditionalPoints: 0, subsequentCandidateSwitches: 0, subsequentRatingChanges: 0,
+      finalCandidateId: null, finalConfidence: null, secondsFromChoiceToFinal: null,
+    }
 
     return {
       ...state,
       sunkCostChoice: action.choice,
       sunkCostShown: true,
       logs: [...state.logs, log],
+      sunkCostEvents: [...state.sunkCostEvents, sunkEvent],
       lastActionElapsedSec: state.elapsedSec,
       phase: action.choice === 'give_up' ? 'decision' : state.phase,
       notice:
@@ -451,6 +504,8 @@ export function gameReducer(
       }
     }
 
+    const requestedStage = state.evidenceEvents.some((event) => event.verifyType === 'deep') ? 'T3' : state.evidenceEvents.some((event) => event.verifyType === 'shallow') ? 'T2' : null
+    if (requestedStage && !state.stageSnapshots.some((snapshot) => snapshot.stage === requestedStage)) return { ...state, pendingSnapshotStage: requestedStage, notice: null }
     return { ...state, phase: 'decision', notice: null }
   }
 
@@ -469,11 +524,18 @@ export function gameReducer(
       candidateId: action.candidateId,
       detail: `最终录用候选人 ${action.candidateId}`,
     })
+    const confidence = clampRating(action.confidence ?? 0)
+    const submissionType = action.submissionType ?? (state.timeLeftSec === 0 ? 'timeout_confirmed' : 'manual')
+    const finalDecision: FinalDecision = { eventId: action.eventId ?? `final-${state.sessionId}`, sessionId: state.sessionId, candidateId: action.candidateId, confidence, submissionType, submittedAt: action.occurredAt ?? new Date().toISOString(), elapsedSec: state.elapsedSec, currentStage: 'FINAL', timeoutSource: submissionType === 'manual' ? null : 'timer' }
+    const finalSnapshot: StageSnapshot = { eventId: `${finalDecision.eventId}-snapshot`, sessionId: state.sessionId, stage: 'FINAL', preferredCandidateId: action.candidateId, confidence, submittedAt: finalDecision.submittedAt }
 
     return {
       ...settled,
       phase: 'report',
       finalCandidateId: action.candidateId,
+      finalDecision,
+      stageSnapshots: [...settled.stageSnapshots.filter((snapshot) => snapshot.stage !== 'FINAL'), finalSnapshot],
+      sunkCostEvents: updateLatestSunkCost(settled.sunkCostEvents, (event) => ({ ...event, finalCandidateId: action.candidateId, finalConfidence: confidence, secondsFromChoiceToFinal: Math.max(0, settled.elapsedSec - event.elapsedSec) })),
       logs: [...settled.logs, log],
       lastActionElapsedSec: settled.elapsedSec,
       notice: null,

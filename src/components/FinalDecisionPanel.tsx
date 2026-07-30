@@ -2,12 +2,13 @@ import type {
   Candidate,
   CandidateRuntimeState,
 } from '../types/game'
+import { useState } from 'react'
 
 type Props = {
   candidates: Candidate[]
   runtime: Record<string, CandidateRuntimeState>
   timeExpired: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, confidence: number) => void
   onBack: () => void
 }
 
@@ -18,6 +19,8 @@ export function FinalDecisionPanel({
   onSelect,
   onBack,
 }: Props) {
+  const [candidateId, setCandidateId] = useState<string | null>(null)
+  const [confidence, setConfidence] = useState<number | null>(null)
   return (
     <div className="modal-backdrop modal-backdrop--decision">
       <section
@@ -42,8 +45,8 @@ export function FinalDecisionPanel({
             return (
               <button
                 key={candidate.id}
-                className="decision-card"
-                onClick={() => onSelect(candidate.id)}
+                className={`decision-card${candidateId === candidate.id ? ' is-selected' : ''}`}
+                onClick={() => setCandidateId(candidate.id)}
               >
                 <span className="terminal-id">终端 {candidate.id}</span>
                 <strong>{candidate.name}</strong>
@@ -56,6 +59,11 @@ export function FinalDecisionPanel({
             )
           })}
         </div>
+        <label className="rating-control">最终决策信心 0–100
+          <input aria-label="最终决策信心" type="range" min="0" max="100" value={confidence ?? 50} onChange={(event) => setConfidence(Number(event.target.value))} />
+          <output>{confidence ?? '未作答'}</output>
+        </label>
+        <button className="button button--primary" disabled={!candidateId || confidence === null} onClick={() => candidateId && confidence !== null && onSelect(candidateId, confidence)}>{timeExpired ? '确认超时决策' : '提交最终录用'}</button>
         {!timeExpired && (
           <button className="text-button" onClick={onBack}>
             返回继续查证
