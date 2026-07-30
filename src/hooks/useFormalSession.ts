@@ -178,7 +178,11 @@ export function useFormalSession() {
       attempts: 0,
     })
     await getOutbox().flush(credentials.sessionId, true)
-    const pending = await getStore().listOutbox(credentials.sessionId)
+    let pending = await getStore().listOutbox(credentials.sessionId)
+    if (pending.some((item) => item.eventId === eventId)) {
+      await getOutbox().flush(credentials.sessionId, true)
+      pending = await getStore().listOutbox(credentials.sessionId)
+    }
     const confirmed = !pending.some((item) => item.eventId === eventId)
     if (confirmed) {
       clearRecoveryPointer()

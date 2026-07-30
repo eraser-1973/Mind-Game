@@ -65,6 +65,21 @@ describe('formal session Worker API', () => {
     expect(await resumed.json()).toMatchObject({ ok: true, data: { status: 'in_progress' } })
   })
 
+  it('identifies a stale in-progress session as abandoned on resume', async () => {
+    const repository = new MemoryRepository()
+    const handler = createApiHandler(repository)
+    const created = await createSession(handler)
+    await repository.updateSession(created.data.sessionId, {
+      lastHeartbeatAt: new Date(Date.now() - 31 * 60 * 1_000).toISOString(),
+    })
+    const response = await handler(new Request(
+      `https://test/api/sessions/${created.data.sessionId}/resume`,
+      { headers: { authorization: `Bearer ${created.data.recoveryToken}` } },
+    ))
+    expect(await response.json()).toMatchObject({ ok: true, data: { status: 'abandoned' } })
+    expect(repository.sessions.get(created.data.sessionId)?.status).toBe('abandoned')
+  })
+
   it('stores the same eventId only once', async () => {
     const repository = new MemoryRepository()
     const handler = createApiHandler(repository)

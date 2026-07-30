@@ -74,6 +74,12 @@ export function GameScreen({
     return () => window.removeEventListener('mind-game:technical-error', onTechnicalError)
   }, [mode])
 
+  useEffect(() => {
+    if (mode === 'formal' && state.technicalPauseStartedAt) {
+      dispatch({ type: 'TECHNICAL_RESUME', occurredAt: new Date().toISOString() })
+    }
+  }, [mode, state.technicalPauseStartedAt])
+
   const verify = (candidateId: string, verifyType: VerifyType) => {
     if (verificationInFlightRef.current) return
     verificationInFlightRef.current = true

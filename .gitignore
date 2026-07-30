@@ -1,6 +1,9 @@
 node_modules/
 dist/
 playtest-artifacts/
+test-results/
+playwright-report/
+vite-e2e.*.log
 doc-preview-pressure/
 *.tsbuildinfo
 vite.config.js

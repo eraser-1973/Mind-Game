@@ -258,6 +258,39 @@ describe('gameReducer', () => {
     expect(state.stageSnapshots[0]).toMatchObject({ stage: 'T1', preferredCandidateId: 'B', confidence: 78 })
   })
 
+  it('requests T2 or T3 snapshots only for formal evidence stages', () => {
+    const rated = (mode: 'formal' | 'quick') => {
+      let state = createInitialGameState(mode, 1_000)
+      for (const candidateId of ['A', 'B', 'C', 'D', 'E']) {
+        state = gameReducer(state, { type: 'RATE', candidateId, stage: 'T1', value: 50 })
+      }
+      return state
+    }
+    let shallow = gameReducer(rated('formal'), { type: 'VERIFY', candidateId: 'B', verifyType: 'shallow' })
+    shallow = gameReducer(shallow, { type: 'OPEN_DECISION' })
+    expect(shallow.pendingSnapshotStage).toBe('T2')
+
+    let deep = gameReducer(rated('formal'), { type: 'VERIFY', candidateId: 'D', verifyType: 'deep' })
+    deep = gameReducer(deep, { type: 'OPEN_DECISION' })
+    expect(deep.pendingSnapshotStage).toBe('T3')
+
+    const quick = gameReducer(rated('quick'), { type: 'OPEN_DECISION' })
+    expect(quick.phase).toBe('decision')
+    expect(quick.pendingSnapshotStage).toBeNull()
+  })
+
+  it('accumulates technical pause time without assigning it to assessment validity', () => {
+    let state = gameReducer(createInitialGameState('formal', 1_000), {
+      type: 'TECHNICAL_ERROR', reason: 'render failed', occurredAt: '2026-07-30T00:00:01.000Z',
+    })
+    state = gameReducer(state, {
+      type: 'TECHNICAL_RESUME', occurredAt: '2026-07-30T00:00:06.000Z',
+    })
+    expect(state.invalidForAssessment).toBe(true)
+    expect(state.technicalPauseMs).toBe(5_000)
+    expect(state.technicalPauseStartedAt).toBeNull()
+  })
+
   it('distinguishes manual and timeout-confirmed final decisions', () => {
     const initial = createInitialGameState('formal', 1_000)
     const manual = gameReducer(initial, { type: 'FINAL_SELECT', candidateId: 'B', confidence: 82, submissionType: 'manual', nowMs: 2_000, eventId: 'final-manual', occurredAt: '2026-07-30T00:10:00.000Z' })
@@ -273,7 +306,13 @@ describe('gameReducer', () => {
     state = gameReducer(state, { type: 'SUNK_COST_CHOICE', choice: 'continue', eventId: 'sunk-1', occurredAt: '2026-07-30T00:02:00.000Z' })
     state = gameReducer(state, { type: 'VERIFY', candidateId: 'A', verifyType: 'deep', eventId: 'verify-after-a', occurredAt: '2026-07-30T00:03:00.000Z' })
     state = gameReducer(state, { type: 'SELECT_CANDIDATE', candidateId: 'B', nowMs: 4_000 })
-    expect(state.sunkCostEvents[0]).toMatchObject({ choice: 'continue', subsequentAdditionalPoints: 3, subsequentCandidateSwitches: 1 })
+    state = gameReducer(state, { type: 'RATE', candidateId: 'A', stage: 'T2', value: 42 })
+    state = gameReducer(state, { type: 'FINAL_SELECT', candidateId: 'B', confidence: 79, submissionType: 'manual', nowMs: 5_000 })
+    expect(state.sunkCostEvents[0]).toMatchObject({
+      choice: 'continue', subsequentAdditionalPoints: 3,
+      subsequentCandidateSwitches: 1, subsequentRatingChanges: 1,
+      finalCandidateId: 'B', finalConfidence: 79,
+    })
   })
 
   it.each(['A', 'C'])('tracks actual risk evidence ids before later investment for %s', (candidateId) => {
