@@ -4,7 +4,11 @@ import {
   taskExperienceGroups,
 } from '../data/researchFlow'
 import type { TaskExperienceData } from '../types/game'
-import { normalizeTaskExperience } from '../utils/researchData'
+import {
+  findFirstUnanswered,
+  isQuestionnaireComplete,
+  normalizeTaskExperience,
+} from '../utils/researchData'
 import { ScaleQuestion } from './ScaleQuestion'
 
 type Props = {
@@ -21,6 +25,20 @@ export function TaskExperienceScreen({
   const [values, setValues] = useState<TaskExperienceData>(
     initialValue ?? defaultTaskExperience,
   )
+  const [showValidation, setShowValidation] = useState(false)
+  const firstUnanswered = findFirstUnanswered(values)
+
+  const submit = () => {
+    if (!isQuestionnaireComplete(values)) {
+      setShowValidation(true)
+      if (firstUnanswered) {
+        document.getElementById(`experience-${firstUnanswered}`)?.focus()
+      }
+      return
+    }
+
+    onSubmit(normalizeTaskExperience(values))
+  }
 
   return (
     <main className="research-screen">
@@ -32,6 +50,11 @@ export function TaskExperienceScreen({
         </p>
 
         <div className="experience-groups">
+          {showValidation && (
+            <p className="research-validation" role="alert">
+              请完成所有题目后再生成报告。
+            </p>
+          )}
           {taskExperienceGroups.map((group) => (
             <section key={group.title} className="experience-group">
               <h2>{group.title}</h2>
@@ -42,6 +65,7 @@ export function TaskExperienceScreen({
                     id={`experience-${item.id}`}
                     label={item.label}
                     value={values[item.id]}
+                    invalid={showValidation && values[item.id] === null}
                     min={item.min}
                     max={item.max}
                     leftLabel={
@@ -69,7 +93,7 @@ export function TaskExperienceScreen({
           </button>
           <button
             className="button button--primary"
-            onClick={() => onSubmit(normalizeTaskExperience(values))}
+            onClick={submit}
           >
             生成抗压决策报告
           </button>

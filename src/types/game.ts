@@ -171,7 +171,7 @@ export type StateAssessmentId =
   | 'mood'
   | 'physicalDiscomfort'
 
-export type StateAssessmentData = Record<StateAssessmentId, number>
+export type StateAssessmentData = Record<StateAssessmentId, number | null>
 
 export type TaskExperienceId =
   | 'timePressure1'
@@ -190,7 +190,7 @@ export type TaskExperienceId =
   | 'cognitiveLoad4'
   | 'decisionConfidence'
 
-export type TaskExperienceData = Record<TaskExperienceId, number>
+export type TaskExperienceData = Record<TaskExperienceId, number | null>
 
 export type ResearchData = {
   participantId: string

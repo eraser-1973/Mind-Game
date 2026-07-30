@@ -51,15 +51,11 @@ export function normalizeStateAssessment(
   data: StateAssessmentData,
 ): StateAssessmentData {
   return {
-    stress: clampScaleValue(data.stress, 0, 10),
-    fatigue: clampScaleValue(data.fatigue, 0, 10),
-    attention: clampScaleValue(data.attention, 0, 10),
-    mood: clampScaleValue(data.mood, 0, 10),
-    physicalDiscomfort: clampScaleValue(
-      data.physicalDiscomfort,
-      0,
-      10,
-    ),
+    stress: normalizeNullableScaleValue(data.stress, 0, 10),
+    fatigue: normalizeNullableScaleValue(data.fatigue, 0, 10),
+    attention: normalizeNullableScaleValue(data.attention, 0, 10),
+    mood: normalizeNullableScaleValue(data.mood, 0, 10),
+    physicalDiscomfort: normalizeNullableScaleValue(data.physicalDiscomfort, 0, 10),
   }
 }
 
@@ -67,15 +63,35 @@ export function normalizeTaskExperience(
   data: TaskExperienceData,
 ): TaskExperienceData {
   return Object.fromEntries(
-    Object.entries(defaultTaskExperience).map(([key, fallback]) => {
+    Object.keys(defaultTaskExperience).map((key) => {
       const typedKey = key as keyof TaskExperienceData
       const min = typedKey === 'decisionConfidence' ? 0 : 1
       return [
         typedKey,
-        clampScaleValue(data[typedKey] ?? fallback, min, 10),
+        normalizeNullableScaleValue(data[typedKey], min, 10),
       ]
     }),
   ) as TaskExperienceData
+}
+
+function normalizeNullableScaleValue(
+  value: number | null,
+  min: number,
+  max: number,
+): number | null {
+  return value === null ? null : clampScaleValue(value, min, max)
+}
+
+export function isQuestionnaireComplete(
+  values: Record<string, number | null>,
+): boolean {
+  return Object.values(values).every((value) => value !== null)
+}
+
+export function findFirstUnanswered(
+  values: Record<string, number | null>,
+): string | null {
+  return Object.keys(values).find((key) => values[key] === null) ?? null
 }
 
 export function assertAnonymousResearchPayload(data: unknown): void {

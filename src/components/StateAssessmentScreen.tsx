@@ -4,7 +4,11 @@ import {
   stateAssessmentItems,
 } from '../data/researchFlow'
 import type { StateAssessmentData } from '../types/game'
-import { normalizeStateAssessment } from '../utils/researchData'
+import {
+  findFirstUnanswered,
+  isQuestionnaireComplete,
+  normalizeStateAssessment,
+} from '../utils/researchData'
 import { ScaleQuestion } from './ScaleQuestion'
 
 type Props = {
@@ -25,10 +29,24 @@ export function StateAssessmentScreen({
   const [values, setValues] = useState<StateAssessmentData>(
     initialValue ?? defaultStateAssessment,
   )
+  const [showValidation, setShowValidation] = useState(false)
   const instruction =
     phase === 'before'
       ? '在开始任务前，请根据您此刻的真实感受进行评价。答案没有对错，仅用于后续数据分析。'
       : '请根据完成任务后的真实感受进行评价。'
+
+  const firstUnanswered = findFirstUnanswered(values)
+  const submit = () => {
+    if (!isQuestionnaireComplete(values)) {
+      setShowValidation(true)
+      if (firstUnanswered) {
+        document.getElementById(`${phase}-${firstUnanswered}`)?.focus()
+      }
+      return
+    }
+
+    onSubmit(normalizeStateAssessment(values))
+  }
 
   return (
     <main className="research-screen">
@@ -42,12 +60,18 @@ export function StateAssessmentScreen({
         </p>
 
         <div className="scale-stack">
+          {showValidation && (
+            <p className="research-validation" role="alert">
+              请完成所有题目后再继续。
+            </p>
+          )}
           {stateAssessmentItems.map((item) => (
             <ScaleQuestion
               key={item.id}
               id={`${phase}-${item.id}`}
               label={item.label}
               value={values[item.id]}
+              invalid={showValidation && values[item.id] === null}
               min={0}
               max={10}
               leftLabel="0=完全没有"
@@ -70,7 +94,7 @@ export function StateAssessmentScreen({
           )}
           <button
             className="button button--primary"
-            onClick={() => onSubmit(normalizeStateAssessment(values))}
+            onClick={submit}
           >
             {phase === 'before' ? '进入招聘决策任务' : '继续'}
           </button>

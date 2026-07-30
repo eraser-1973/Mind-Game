@@ -6,6 +6,8 @@ import {
   buildAnonymousResearchExport,
   clampScaleValue,
   createResearchData,
+  findFirstUnanswered,
+  isQuestionnaireComplete,
   normalizeStateAssessment,
   normalizeTaskExperience,
 } from './researchData'
@@ -69,6 +71,42 @@ describe('researchData utilities', () => {
       timePressure2: 10,
       decisionConfidence: 0,
     })
+  })
+
+  it('preserves unanswered questionnaire items as null instead of silently using a midpoint', () => {
+    const state = {
+      stress: null,
+      fatigue: 6,
+      attention: null,
+      mood: 5,
+      physicalDiscomfort: 0,
+    }
+
+    expect(normalizeStateAssessment(state)).toEqual(state)
+    expect(isQuestionnaireComplete(state)).toBe(false)
+    expect(findFirstUnanswered(state)).toBe('stress')
+
+    const experience = {
+      timePressure1: null,
+      timePressure2: 6,
+      resourceLimit1: 6,
+      resourceLimit2: 6,
+      socialEvaluation1: 6,
+      socialEvaluation2: 6,
+      outcomeResponsibility1: 6,
+      outcomeResponsibility2: 6,
+      uncontrollability1: 6,
+      uncontrollability2: 6,
+      cognitiveLoad1: 6,
+      cognitiveLoad2: 6,
+      cognitiveLoad3: 6,
+      cognitiveLoad4: 6,
+      decisionConfidence: null,
+    }
+
+    expect(normalizeTaskExperience(experience).timePressure1).toBeNull()
+    expect(normalizeTaskExperience(experience).decisionConfidence).toBeNull()
+    expect(findFirstUnanswered(experience)).toBe('timePressure1')
   })
 
   it('builds export data with questionnaires, game logs, Niko messages and report metrics', () => {

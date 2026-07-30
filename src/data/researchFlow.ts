@@ -2,6 +2,7 @@ import type {
   DemographicData,
   StateAssessmentData,
   StateAssessmentId,
+  TaskExperienceData,
   TaskExperienceId,
 } from '../types/game'
 
@@ -74,11 +75,11 @@ export const stateAssessmentItems: Array<{
 ]
 
 export const defaultStateAssessment: StateAssessmentData = {
-  stress: 5,
-  fatigue: 5,
-  attention: 5,
-  mood: 5,
-  physicalDiscomfort: 5,
+  stress: null,
+  fatigue: null,
+  attention: null,
+  mood: null,
+  physicalDiscomfort: null,
 }
 
 export const taskExperienceGroups: Array<{
@@ -221,7 +222,7 @@ export const defaultTaskExperience = Object.fromEntries(
   taskExperienceGroups.flatMap((group) =>
     group.items.map((item) => [
       item.id,
-      item.min === 0 ? 5 : 6,
+      null,
     ]),
   ),
-) as Record<TaskExperienceId, number>
+) as TaskExperienceData
