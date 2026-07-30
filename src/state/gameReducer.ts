@@ -147,7 +147,7 @@ const makeLog = (
     | 'responseTimeSec'
   >,
 ): GameLog => ({
-  id: `log-${state.logs.length + 1}`,
+  id: `log-${state.sessionId}-${state.logs.length + 1}`,
   timeLeftSec: state.timeLeftSec,
   elapsedSec: state.elapsedSec,
   pressureStage: stageFor(state),

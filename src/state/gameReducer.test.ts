@@ -324,4 +324,18 @@ describe('gameReducer', () => {
     expect(event?.riskEvidenceIdsPreviouslySeen.length).toBeGreaterThan(0)
     expect(event?.additionalPointsThisEvent).toBe(3)
   })
+
+  it('creates server-valid log ids scoped to the formal session', () => {
+    const first = gameReducer(
+      { ...createInitialGameState('formal', 1_000), sessionId: 'sess-first-1234' },
+      { type: 'SELECT_CANDIDATE', candidateId: 'B', nowMs: 2_000 },
+    )
+    const second = gameReducer(
+      { ...createInitialGameState('formal', 1_000), sessionId: 'sess-second-1234' },
+      { type: 'SELECT_CANDIDATE', candidateId: 'B', nowMs: 2_000 },
+    )
+
+    expect(first.logs[0].id).toMatch(/^[a-zA-Z0-9_-]{6,128}$/)
+    expect(first.logs[0].id).not.toBe(second.logs[0].id)
+  })
 })
