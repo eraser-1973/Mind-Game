@@ -29,6 +29,8 @@ type Props = {
   onRestart: () => void
   researchData?: ResearchData | null
   onGameComplete?: (state: GameState) => void
+  initialState?: GameState | null
+  onStateChange?: (state: GameState) => void
 }
 
 export function GameScreen({
@@ -36,16 +38,20 @@ export function GameScreen({
   onRestart,
   researchData = null,
   onGameComplete,
+  initialState = null,
+  onStateChange,
 }: Props) {
   const [state, dispatch] = useReducer(
     gameReducer,
     undefined,
-    () => createInitialGameState(mode, Date.now(), researchData),
+    () => initialState ?? createInitialGameState(mode, Date.now(), researchData),
   )
   const completionNotifiedRef = useRef(false)
   const verificationInFlightRef = useRef(false)
   const [pendingVerifyType, setPendingVerifyType] =
     useState<VerifyType | null>(null)
+
+  useEffect(() => { onStateChange?.(state) }, [onStateChange, state])
 
   const verify = (candidateId: string, verifyType: VerifyType) => {
     if (verificationInFlightRef.current) return
