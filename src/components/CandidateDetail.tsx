@@ -12,6 +12,7 @@ type Props = {
   runtime: CandidateRuntimeState
   availablePoints: number
   investigationLocked: boolean
+  pendingVerifyType?: VerifyType | null
   onVerify: (type: VerifyType) => void
   onRate: (stage: RatingStage, value: number) => void
   onScorePreview?: (stage: RatingStage, value: number) => void
@@ -22,6 +23,7 @@ export function CandidateDetail({
   runtime,
   availablePoints,
   investigationLocked,
+  pendingVerifyType,
   onVerify,
   onRate,
   onScorePreview,
@@ -71,6 +73,7 @@ export function CandidateDetail({
         runtime={runtime}
         availablePoints={availablePoints}
         locked={investigationLocked}
+        pendingVerifyType={pendingVerifyType}
         onVerify={onVerify}
       />
 

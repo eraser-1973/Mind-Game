@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { candidates, candidateById } from '../data/candidates'
 import {
   allT1Rated,
@@ -10,7 +10,9 @@ import type {
   GameMode,
   GameState,
   ResearchData,
+  VerifyType,
 } from '../types/game'
+import { createSessionEventId } from '../utils/sessionData'
 import { createNikoFeedback } from '../utils/nikoFeedback'
 import { generateReport } from '../utils/report'
 import { CandidateDetail } from './CandidateDetail'
@@ -41,6 +43,26 @@ export function GameScreen({
     () => createInitialGameState(mode, Date.now(), researchData),
   )
   const completionNotifiedRef = useRef(false)
+  const verificationInFlightRef = useRef(false)
+  const [pendingVerifyType, setPendingVerifyType] =
+    useState<VerifyType | null>(null)
+
+  const verify = (candidateId: string, verifyType: VerifyType) => {
+    if (verificationInFlightRef.current) return
+    verificationInFlightRef.current = true
+    setPendingVerifyType(verifyType)
+    dispatch({
+      type: 'VERIFY',
+      candidateId,
+      verifyType,
+      eventId: createSessionEventId(),
+      occurredAt: new Date().toISOString(),
+    })
+    window.setTimeout(() => {
+      verificationInFlightRef.current = false
+      setPendingVerifyType(null)
+    }, 0)
+  }
 
   useEffect(() => {
     if (state.phase !== 'playing') return
@@ -139,19 +161,16 @@ export function GameScreen({
           runtime={state.runtime[selected.id]}
           availablePoints={state.availablePoints}
           investigationLocked={!initialRatingsComplete}
-          onVerify={(verifyType) =>
-            dispatch({
-              type: 'VERIFY',
-              candidateId: selected.id,
-              verifyType,
-            })
-          }
+          pendingVerifyType={pendingVerifyType}
+          onVerify={(verifyType) => verify(selected.id, verifyType)}
           onRate={(stage, value) =>
             dispatch({
               type: 'RATE',
               candidateId: selected.id,
               stage,
               value,
+              eventId: createSessionEventId(),
+              occurredAt: new Date().toISOString(),
             })
           }
           onScorePreview={(stage, value) => {

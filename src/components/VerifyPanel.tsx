@@ -4,6 +4,7 @@ type Props = {
   runtime: CandidateRuntimeState
   availablePoints: number
   locked: boolean
+  pendingVerifyType?: VerifyType | null
   onVerify: (type: VerifyType) => void
 }
 
@@ -11,6 +12,7 @@ export function VerifyPanel({
   runtime,
   availablePoints,
   locked,
+  pendingVerifyType = null,
   onVerify,
 }: Props) {
   return (
@@ -25,7 +27,12 @@ export function VerifyPanel({
       <div className="verify-actions">
         <button
           className="verify-button"
-          disabled={locked || runtime.shallowUnlocked || availablePoints < 1}
+          disabled={
+            locked ||
+            pendingVerifyType !== null ||
+            runtime.shallowUnlocked ||
+            availablePoints < 1
+          }
           onClick={() => onVerify('shallow')}
         >
           <span className="verify-button__cost">−1</span>
@@ -36,7 +43,12 @@ export function VerifyPanel({
         </button>
         <button
           className="verify-button verify-button--deep"
-          disabled={locked || runtime.deepUnlocked || availablePoints < 3}
+          disabled={
+            locked ||
+            pendingVerifyType !== null ||
+            runtime.deepUnlocked ||
+            availablePoints < 3
+          }
           onClick={() => onVerify('deep')}
           title={availablePoints < 3 ? '深度查证需要 3 点' : undefined}
         >
