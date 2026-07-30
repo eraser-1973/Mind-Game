@@ -22,6 +22,11 @@ export const formalSessionApi = {
     const paths = { events: 'events', snapshots: 'snapshots', heartbeat: 'heartbeat', complete: 'complete', abandon: 'abandon', client_error: '' }
     const path = item.kind === 'client_error' ? '/api/client-errors' : `/api/sessions/${item.sessionId}/${paths[item.kind]}`
     const method = item.kind === 'heartbeat' ? 'PATCH' : 'POST'
-    await call(path, { method, body: JSON.stringify(item.payload), keepalive: item.kind === 'heartbeat' || item.kind === 'abandon' || item.kind === 'client_error' }, token)
+    try {
+      await call(path, { method, body: JSON.stringify(item.payload), keepalive: item.kind === 'heartbeat' || item.kind === 'abandon' || item.kind === 'client_error' }, token)
+    } catch (cause) {
+      if (item.kind === 'complete' && cause instanceof Error && cause.message.includes('SESSION_ALREADY_COMPLETED')) return
+      throw cause
+    }
   },
 }

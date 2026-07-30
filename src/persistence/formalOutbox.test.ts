@@ -35,6 +35,28 @@ describe('formal offline outbox', () => {
     expect(retained.nextAttemptAt).toBeTruthy()
   })
 
+  it('stops after a failed item so completion cannot overtake behavior events', async () => {
+    const store = new MemoryFormalSessionStore()
+    const uploaded: string[] = []
+    const outbox = new FormalOutbox(store, async (item) => {
+      uploaded.push(item.eventId)
+      if (item.kind === 'events') throw new Error('offline')
+    })
+    await outbox.enqueue({
+      eventId: 'evt-before-complete', sessionId: 'sess-test-001', kind: 'events',
+      payload: {}, queuedAt: '2026-07-30T00:00:00.000Z', attempts: 0,
+    })
+    await outbox.enqueue({
+      eventId: 'complete-after-events', sessionId: 'sess-test-001', kind: 'complete',
+      payload: {}, queuedAt: '2026-07-30T00:00:01.000Z', attempts: 0,
+    })
+
+    await outbox.flush()
+
+    expect(uploaded).toEqual(['evt-before-complete'])
+    expect(await store.listOutbox()).toHaveLength(2)
+  })
+
   it('uses separate formal and quick policies and forbids quick backend persistence', () => {
     expect(modePolicies.formal.backendPersistence).toBe(true)
     expect(modePolicies.quick.backendPersistence).toBe(false)

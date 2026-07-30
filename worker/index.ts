@@ -97,28 +97,28 @@ export function createApiHandler(repository: FormalSessionRepository) {
         const body = await parseBody(request); const events = Array.isArray(body.events) ? body.events.map(validateEvent) : []
         const unseen = []
         for (const event of events) if (!await repository.hasEvent(String(event.eventId))) unseen.push(event)
-        if (unseen.length && session.status !== 'in_progress') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束，不能写入新事件。')
+        if (unseen.length && session.status !== 'in_progress' && session.status !== 'technical_error') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束，不能写入新事件。')
         const now = new Date().toISOString()
         await repository.insertEvents(unseen.map((event) => ({ eventId: String(event.eventId), sessionId, eventType: String(event.eventType), candidateId: typeof event.candidateId === 'string' ? event.candidateId : null, stage: typeof event.stage === 'string' ? event.stage : null, occurredAt: String(event.occurredAt), elapsedSec: isInteger(event.elapsedSec, 0) ? Number(event.elapsedSec) : null, payloadJson: JSON.stringify(event.payload ?? {}), createdAt: now })))
         await repository.updateSession(sessionId, { updatedAt: now })
         return ok({ accepted: events.length, inserted: unseen.length })
       }
       if (operation === 'snapshots' && request.method === 'POST') {
-        if (session.status !== 'in_progress') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束。')
+        if (session.status !== 'in_progress' && session.status !== 'technical_error') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束。')
         const body = await parseBody(request); validateAnonymous(body); const snapshots = Array.isArray(body.snapshots) ? body.snapshots as Record<string, unknown>[] : []
         for (const item of snapshots) if (!EVENT_ID.test(String(item.snapshotId ?? '')) || !['T1', 'T2', 'T3', 'FINAL'].includes(String(item.stage)) || typeof item.preferredCandidateId !== 'string' || !isInteger(item.confidence, 0, 100)) throw apiError(400, 'INVALID_SNAPSHOT', '阶段快照字段无效。')
         await repository.insertSnapshots(snapshots.map((item) => ({ snapshotId: String(item.snapshotId), sessionId, stage: item.stage as 'T1' | 'T2' | 'T3' | 'FINAL', preferredCandidateId: String(item.preferredCandidateId), confidence: Number(item.confidence), submittedAt: String(item.submittedAt), payloadJson: JSON.stringify(item.payload ?? null) })))
         return ok({ accepted: snapshots.length })
       }
       if (operation === 'heartbeat' && request.method === 'PATCH') {
-        if (session.status !== 'in_progress') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束。')
+        if (session.status !== 'in_progress' && session.status !== 'technical_error') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话已结束。')
         const body = await parseBody(request); validateAnonymous(body); const now = new Date().toISOString()
         await repository.updateSession(sessionId, { lastHeartbeatAt: now, updatedAt: now, finalPayloadJson: JSON.stringify({ heartbeat: body }) })
         return ok({ lastHeartbeatAt: now })
       }
       if (operation === 'complete' && request.method === 'POST') {
         if (session.status === 'completed') throw apiError(409, 'SESSION_ALREADY_COMPLETED', '会话已经完成。')
-        if (session.status !== 'in_progress') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话不能完成。')
+        if (session.status !== 'in_progress' && session.status !== 'technical_error') throw apiError(409, 'SESSION_NOT_WRITABLE', '会话不能完成。')
         const body = await parseBody(request); validateAnonymous(body)
         if (typeof body.finalCandidateId !== 'string' || !isInteger(body.finalConfidence, 0, 100) || !['manual', 'timeout_confirmed', 'timeout_auto'].includes(String(body.submissionType))) throw apiError(400, 'INVALID_FINAL_DECISION', '最终决策字段无效。')
         const now = new Date().toISOString(); await repository.updateSession(sessionId, { status: 'completed', completedAt: now, updatedAt: now, submissionType: String(body.submissionType), finalCandidateId: String(body.finalCandidateId), finalConfidence: Number(body.finalConfidence), finalPayloadJson: JSON.stringify(body.finalPayload ?? null) })

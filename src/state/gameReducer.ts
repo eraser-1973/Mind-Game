@@ -52,7 +52,7 @@ export type GameAction =
   | { type: 'CAPTURE_STAGE_SNAPSHOT'; stage: PersistedStage; preferredCandidateId: string; confidence: number; eventId?: string; occurredAt?: string }
   | { type: 'OPEN_DECISION' }
   | { type: 'RESUME_PLAYING' }
-  | { type: 'FINAL_SELECT'; candidateId: string; confidence?: number; submissionType?: SubmissionType; nowMs: number; eventId?: string; occurredAt?: string }
+  | { type: 'FINAL_SELECT'; candidateId: string; confidence: number; submissionType: SubmissionType; nowMs: number; eventId?: string; occurredAt?: string }
   | { type: 'DISMISS_NOTICE' }
   | { type: 'NIKO_FEEDBACK'; message: NikoMessage }
   | { type: 'TECHNICAL_ERROR'; reason: string; occurredAt?: string }
@@ -440,6 +440,7 @@ export function gameReducer(
       sessionId: state.sessionId,
       candidateId: action.candidateId,
       evidenceId: evidenceBundle[0]?.id ?? `${action.candidateId}-${action.verifyType}`,
+      evidenceIds: evidenceBundle.map((evidence) => evidence.id),
       verifyType: action.verifyType,
       evidencePolarity: evidenceBundle.some((evidence) => evidence.isNegative)
         ? 'negative'
@@ -556,8 +557,8 @@ export function gameReducer(
       candidateId: action.candidateId,
       detail: `最终录用候选人 ${action.candidateId}`,
     })
-    const confidence = clampRating(action.confidence ?? 0)
-    const submissionType = action.submissionType ?? (state.timeLeftSec === 0 ? 'timeout_confirmed' : 'manual')
+    const confidence = clampRating(action.confidence)
+    const submissionType = action.submissionType
     const finalDecision: FinalDecision = { eventId: action.eventId ?? `final-${state.sessionId}`, sessionId: state.sessionId, candidateId: action.candidateId, confidence, submissionType, submittedAt: action.occurredAt ?? new Date().toISOString(), elapsedSec: state.elapsedSec, currentStage: 'FINAL', timeoutSource: submissionType === 'manual' ? null : 'timer' }
     const finalSnapshot: StageSnapshot = { eventId: `${finalDecision.eventId}-snapshot`, sessionId: state.sessionId, stage: 'FINAL', preferredCandidateId: action.candidateId, confidence, submittedAt: finalDecision.submittedAt }
 

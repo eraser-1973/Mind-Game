@@ -20,6 +20,7 @@ export type ResearchStep =
   | 'preTask'
   | 'postTask'
   | 'taskExperience'
+  | 'submitting'
   | 'report'
 
 export type Evidence = {
@@ -229,6 +230,7 @@ export type EvidenceEvent = {
   sessionId: string
   candidateId: string
   evidenceId: string
+  evidenceIds: string[]
   verifyType: VerifyType
   evidencePolarity: EvidencePolarity
   viewedAt: string

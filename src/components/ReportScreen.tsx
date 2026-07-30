@@ -31,6 +31,11 @@ const revisionText = (
 
 export function ReportScreen({ report, onRestart, sourceState }: Props) {
   const selected = report.selectedCandidate
+  const submissionLabels = {
+    manual: '主动提交',
+    timeout_confirmed: '超时后确认',
+    timeout_auto: '系统超时自动提交',
+  } as const
   const logSummary = report.logs.slice(-16)
   const handleExportJson = () => {
     const exportData = sourceState
@@ -104,6 +109,11 @@ export function ReportScreen({ report, onRestart, sourceState }: Props) {
           <p>
             选择结果用于校验证据判断与岗位匹配基准之间的距离，而不是评价候选人的人格价值。
           </p>
+          {sourceState?.finalDecision && (
+            <p className="decision-submission-meta">
+              {submissionLabels[sourceState.finalDecision.submissionType]} · 最终信心 {sourceState.finalDecision.confidence}/100
+            </p>
+          )}
         </article>
 
         <article className="report-card">
@@ -251,9 +261,11 @@ export function ReportScreen({ report, onRestart, sourceState }: Props) {
         <button className="button button--primary" onClick={onRestart}>
           重新开始
         </button>
-        <button className="button button--ghost" onClick={handleExportJson}>
-          导出 JSON 数据
-        </button>
+        {report.mode === 'quick' && (
+          <button className="button button--ghost" onClick={handleExportJson}>
+            导出 JSON 数据
+          </button>
+        )}
       </footer>
     </main>
   )

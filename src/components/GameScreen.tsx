@@ -32,6 +32,7 @@ type Props = {
   onGameComplete?: (state: GameState) => void
   initialState?: GameState | null
   onStateChange?: (state: GameState) => void
+  sessionId?: string | null
 }
 
 export function GameScreen({
@@ -41,11 +42,16 @@ export function GameScreen({
   onGameComplete,
   initialState = null,
   onStateChange,
+  sessionId = null,
 }: Props) {
   const [state, dispatch] = useReducer(
     gameReducer,
     undefined,
-    () => initialState ?? createInitialGameState(mode, Date.now(), researchData),
+    () => {
+      if (initialState) return initialState
+      const created = createInitialGameState(mode, Date.now(), researchData)
+      return mode === 'formal' && sessionId ? { ...created, sessionId } : created
+    },
   )
   const completionNotifiedRef = useRef(false)
   const verificationInFlightRef = useRef(false)

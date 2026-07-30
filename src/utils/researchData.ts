@@ -130,8 +130,18 @@ export function buildAnonymousResearchExport(
       },
       runtime: report.runtime,
       logs: report.logs,
+      stageSnapshots: state.stageSnapshots,
+      ratingEvents: state.ratingEvents,
+      evidenceEvents: state.evidenceEvents,
+      sunkCostEvents: state.sunkCostEvents,
+      finalDecision: state.finalDecision,
       sunkCostChoice: report.sunkCostChoice,
       nikoMessages: report.nikoMessages,
+      technicalValidity: {
+        invalidForAssessment: state.invalidForAssessment,
+        invalidReason: state.invalidReason,
+        technicalPauseMs: state.technicalPauseMs,
+      },
     },
     reportMetrics: {
       roi: report.roi,

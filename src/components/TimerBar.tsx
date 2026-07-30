@@ -28,7 +28,7 @@ export function TimerBar({
       <div className="timer-bar__identity">
         <span className="status-dot" />
         <div>
-          <span>招聘模拟舱 / {mode === 'quick' ? 'QUICK TEST' : 'FORMAL'}</span>
+          <span>招聘模拟舱 / {mode === 'quick' ? 'QUICK TEST' : '正式测评 / FORMAL'}</span>
           <strong>{labels[stage]}</strong>
         </div>
       </div>
