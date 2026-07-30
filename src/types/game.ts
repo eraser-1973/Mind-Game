@@ -90,6 +90,7 @@ export type CandidateRuntimeState = {
   deepCount: number
   shallowUnlocked: boolean
   deepUnlocked: boolean
+  viewedEvidenceIds: string[]
   negativeEvidenceSeen: boolean
   addedAfterNegative: boolean
   viewTimeMs: number
@@ -344,6 +345,10 @@ export type GameState = {
   notice: string | null
   participantId: string | null
   researchData: ResearchData | null
+  sessionId: string
+  stageSnapshots: StageSnapshot[]
+  ratingEvents: RatingEvent[]
+  evidenceEvents: EvidenceEvent[]
 }
 
 export type ROIResult = {

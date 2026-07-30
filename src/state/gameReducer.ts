@@ -5,6 +5,8 @@ import type {
   GameMode,
   GameState,
   NikoMessage,
+  RatingEvent,
+  EvidenceEvent,
   PressureStage,
   RatingStage,
   ResearchData,
@@ -30,11 +32,15 @@ export type GameAction =
       candidateId: string
       stage: RatingStage
       value: number
+      eventId?: string
+      occurredAt?: string
     }
   | {
       type: 'VERIFY'
       candidateId: string
       verifyType: VerifyType
+      eventId?: string
+      occurredAt?: string
     }
   | { type: 'TICK'; deltaSec: number }
   | { type: 'SUNK_COST_CHOICE'; choice: Exclude<SunkCostChoice, null> }
@@ -54,6 +60,7 @@ const createRuntimeState = (
   deepCount: 0,
   shallowUnlocked: false,
   deepUnlocked: false,
+  viewedEvidenceIds: [],
   negativeEvidenceSeen: false,
   addedAfterNegative: false,
   viewTimeMs: 0,
@@ -96,6 +103,10 @@ export function createInitialGameState(
     notice: null,
     participantId: researchData?.participantId ?? null,
     researchData,
+    sessionId: `local-${nowMs}`,
+    stageSnapshots: [],
+    ratingEvents: [],
+    evidenceEvents: [],
   }
 }
 
@@ -248,6 +259,16 @@ export function gameReducer(
       candidateId: action.candidateId,
       detail: `提交 ${action.stage} 评分：${value}`,
     })
+    const ratingEvent: RatingEvent = {
+      eventId: action.eventId ?? `rate-${state.sessionId}-${state.ratingEvents.length + 1}`,
+      sessionId: state.sessionId,
+      candidateId: action.candidateId,
+      stage: action.stage,
+      score: value,
+      relatedEvidenceIds: [...runtime.viewedEvidenceIds],
+      submittedAt: action.occurredAt ?? new Date().toISOString(),
+      elapsedSec: state.elapsedSec,
+    }
 
     return {
       ...state,
@@ -256,6 +277,7 @@ export function gameReducer(
         [action.candidateId]: nextRuntime,
       },
       logs: [...state.logs, log],
+      ratingEvents: [...state.ratingEvents, ratingEvent],
       lastActionElapsedSec: state.elapsedSec,
       notice: `${action.stage} 评分已封存；后续重评不会显示这次分数。`,
     }
@@ -265,6 +287,12 @@ export function gameReducer(
     const runtime = state.runtime[action.candidateId]
     const candidate = candidateById[action.candidateId]
     if (!runtime || !candidate) return state
+    if (
+      action.eventId &&
+      state.evidenceEvents.some((event) => event.eventId === action.eventId)
+    ) {
+      return state
+    }
 
     const cost = action.verifyType === 'shallow' ? 1 : 3
     const alreadyUnlocked =
@@ -304,6 +332,12 @@ export function gameReducer(
         runtime.shallowUnlocked || action.verifyType === 'shallow',
       deepUnlocked:
         runtime.deepUnlocked || action.verifyType === 'deep',
+      viewedEvidenceIds: [
+        ...runtime.viewedEvidenceIds,
+        ...evidenceBundle
+          .map((evidence) => evidence.id)
+          .filter((id) => !runtime.viewedEvidenceIds.includes(id)),
+      ],
       negativeEvidenceSeen:
         runtime.negativeEvidenceSeen ||
         evidenceBundle.some((evidence) => evidence.isNegative),
@@ -333,6 +367,35 @@ export function gameReducer(
             tone: 'warning' as const,
           }
         : null
+    const pointsBefore = state.availablePoints
+    const evidenceEvent: EvidenceEvent = {
+      eventId:
+        action.eventId ??
+        `verify-${state.sessionId}-${state.evidenceEvents.length + 1}`,
+      sessionId: state.sessionId,
+      candidateId: action.candidateId,
+      evidenceId: evidenceBundle[0]?.id ?? `${action.candidateId}-${action.verifyType}`,
+      verifyType: action.verifyType,
+      evidencePolarity: evidenceBundle.some((evidence) => evidence.isNegative)
+        ? 'negative'
+        : 'positive',
+      viewedAt: action.occurredAt ?? new Date().toISOString(),
+      elapsedSec: state.elapsedSec,
+      pointsBefore,
+      pointsCost: cost,
+      pointsAfter: pointsBefore - cost,
+      riskEvidenceSeenBefore: runtime.negativeEvidenceSeen,
+      addedAfterRiskEvidence: addedAfterNegative && candidate.isToxic,
+      cumulativeAddedAfterRiskEvidence:
+        state.evidenceEvents
+          .filter(
+            (event) =>
+              event.candidateId === action.candidateId &&
+              event.addedAfterRiskEvidence,
+          )
+          .reduce((total, event) => total + event.pointsCost, 0) +
+        (addedAfterNegative && candidate.isToxic ? cost : 0),
+    }
 
     return {
       ...state,
@@ -342,6 +405,7 @@ export function gameReducer(
         [action.candidateId]: nextRuntime,
       },
       logs: [...state.logs, log],
+      evidenceEvents: [...state.evidenceEvents, evidenceEvent],
       chats: warningChat
         ? [...state.chats, warningChat]
         : state.chats,

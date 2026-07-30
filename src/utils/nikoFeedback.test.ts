@@ -23,6 +23,7 @@ const runtimeWithRatings = (
   deepCount: 0,
   shallowUnlocked: true,
   deepUnlocked: false,
+  viewedEvidenceIds: [],
   negativeEvidenceSeen: false,
   addedAfterNegative: false,
   viewTimeMs: 0,

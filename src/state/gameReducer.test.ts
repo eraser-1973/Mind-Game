@@ -97,6 +97,58 @@ describe('gameReducer', () => {
     expect(twice.availablePoints).toBe(4)
   })
 
+  it('records one immutable evidence event with conserved points for a successful verification', () => {
+    const initial = createInitialGameState('formal', 1_000)
+    const verified = gameReducer(initial, {
+      type: 'VERIFY',
+      candidateId: 'A',
+      verifyType: 'shallow',
+      eventId: 'verify-A-1',
+      occurredAt: '2026-07-30T00:00:10.000Z',
+    })
+
+    expect(verified.evidenceEvents).toHaveLength(1)
+    expect(verified.evidenceEvents[0]).toMatchObject({
+      eventId: 'verify-A-1',
+      candidateId: 'A',
+      pointsBefore: 5,
+      pointsCost: 1,
+      pointsAfter: 4,
+    })
+    expect(verified.availablePoints).toBe(4)
+    expect(
+      verified.availablePoints +
+        verified.evidenceEvents.reduce((sum, event) => sum + event.pointsCost, 0),
+    ).toBe(5)
+  })
+
+  it('uses only actually unlocked evidence ids in a T2 rating event', () => {
+    let state = createInitialGameState('formal', 1_000)
+    state = gameReducer(state, {
+      type: 'VERIFY',
+      candidateId: 'B',
+      verifyType: 'shallow',
+      eventId: 'verify-B-1',
+      occurredAt: '2026-07-30T00:00:10.000Z',
+    })
+    state = gameReducer(state, {
+      type: 'RATE',
+      candidateId: 'B',
+      stage: 'T2',
+      value: 71,
+      eventId: 'rate-B-T2-1',
+      occurredAt: '2026-07-30T00:00:12.000Z',
+    })
+
+    expect(state.ratingEvents).toHaveLength(1)
+    expect(state.ratingEvents[0].relatedEvidenceIds).toEqual(
+      state.runtime.B.viewedEvidenceIds,
+    )
+    expect(state.ratingEvents[0].relatedEvidenceIds).not.toEqual(
+      expect.arrayContaining(['B-deep-1', 'B-deep-2']),
+    )
+  })
+
   it('refuses deep verification when fewer than three points remain', () => {
     let state = createInitialGameState('quick', 1_000)
     state = gameReducer(state, {
