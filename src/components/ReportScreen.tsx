@@ -4,6 +4,7 @@ import {
   CANDIDATE_DIMENSION_WEIGHTS,
 } from '../data/candidates'
 import { exportJson } from '../utils/exportJson'
+import { formatDisplayedCopy } from '../utils/display'
 import { buildAnonymousResearchExport } from '../utils/researchData'
 import { formatTime } from '../utils/time'
 
@@ -166,7 +167,7 @@ export function ReportScreen({ report, onRestart, sourceState }: Props) {
         <article className="report-card">
           <span className="eyebrow">沉没成本</span>
           <h2>损失厌恶解释</h2>
-          <p>{report.lossAversion}</p>
+          <p>{formatDisplayedCopy(report.lossAversion)}</p>
         </article>
       </section>
 

@@ -258,13 +258,68 @@ describe('gameReducer', () => {
     expect(state.stageSnapshots[0]).toMatchObject({ stage: 'T1', preferredCandidateId: 'B', confidence: 78 })
   })
 
+  it('queues and captures the T1 snapshot only once after all five T1 ratings', () => {
+    let state = createInitialGameState('quick', 1_000)
+
+    for (const candidateId of ['A', 'B', 'C', 'D', 'E']) {
+      state = gameReducer(state, {
+        type: 'RATE',
+        candidateId,
+        stage: 'T1',
+        value: 50,
+      })
+    }
+
+    expect(state.pendingSnapshotStage).toBe('T1')
+
+    state = gameReducer(state, {
+      type: 'CAPTURE_STAGE_SNAPSHOT',
+      stage: 'T1',
+      preferredCandidateId: 'B',
+      confidence: 72,
+      eventId: 'snapshot-t1-first',
+      occurredAt: '2026-07-30T00:01:00.000Z',
+    })
+
+    expect(state.pendingSnapshotStage).toBeNull()
+    expect(state.stageSnapshots.filter((snapshot) => snapshot.stage === 'T1')).toHaveLength(1)
+
+    state = gameReducer(state, {
+      type: 'RATE',
+      candidateId: 'A',
+      stage: 'T1',
+      value: 55,
+    })
+    state = gameReducer(state, {
+      type: 'CAPTURE_STAGE_SNAPSHOT',
+      stage: 'T1',
+      preferredCandidateId: 'D',
+      confidence: 88,
+      eventId: 'snapshot-t1-duplicate',
+      occurredAt: '2026-07-30T00:02:00.000Z',
+    })
+
+    expect(state.pendingSnapshotStage).toBeNull()
+    expect(state.stageSnapshots.filter((snapshot) => snapshot.stage === 'T1')).toHaveLength(1)
+    expect(state.stageSnapshots.find((snapshot) => snapshot.stage === 'T1')).toMatchObject({
+      eventId: 'snapshot-t1-first',
+      preferredCandidateId: 'B',
+      confidence: 72,
+    })
+  })
+
   it('requests T2 or T3 snapshots only for formal evidence stages', () => {
     const rated = (mode: 'formal' | 'quick') => {
       let state = createInitialGameState(mode, 1_000)
       for (const candidateId of ['A', 'B', 'C', 'D', 'E']) {
         state = gameReducer(state, { type: 'RATE', candidateId, stage: 'T1', value: 50 })
       }
-      return state
+      return gameReducer(state, {
+        type: 'CAPTURE_STAGE_SNAPSHOT',
+        stage: 'T1',
+        preferredCandidateId: 'B',
+        confidence: 70,
+      })
     }
     let shallow = gameReducer(rated('formal'), { type: 'VERIFY', candidateId: 'B', verifyType: 'shallow' })
     shallow = gameReducer(shallow, { type: 'OPEN_DECISION' })

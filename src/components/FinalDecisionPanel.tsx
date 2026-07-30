@@ -3,6 +3,7 @@ import type {
   CandidateRuntimeState,
 } from '../types/game'
 import { useState } from 'react'
+import { formatDisplayedValue } from '../utils/display'
 
 type Props = {
   candidates: Candidate[]
@@ -39,16 +40,23 @@ export function FinalDecisionPanel({
         <div className="decision-grid">
           {candidates.map((candidate) => {
             const item = runtime[candidate.id]
+            const isSelected = candidateId === candidate.id
             const stages = ['T1', 'T2', 'T3'].filter(
               (stage) => item.ratings[stage as 'T1' | 'T2' | 'T3'],
             )
             return (
               <button
                 key={candidate.id}
-                className={`decision-card${candidateId === candidate.id ? ' is-selected' : ''}`}
+                type="button"
+                className={`decision-card decision-candidate-card${isSelected ? ' is-selected' : ''}`}
+                aria-label={`选择候选人 ${candidate.id} ${candidate.name}`}
+                aria-pressed={isSelected}
                 onClick={() => setCandidateId(candidate.id)}
               >
                 <span className="terminal-id">终端 {candidate.id}</span>
+                <span className="decision-card__selection" aria-hidden="true">
+                  ✓ 已选择
+                </span>
                 <strong>{candidate.name}</strong>
                 <small>{candidate.role}</small>
                 <div>
@@ -61,9 +69,9 @@ export function FinalDecisionPanel({
         </div>
         <label className="rating-control">最终决策信心 0–100
           <input aria-label="最终决策信心" type="range" min="0" max="100" value={confidence ?? 50} onChange={(event) => setConfidence(Number(event.target.value))} />
-          <output>{confidence ?? '未作答'}</output>
+          <output>{formatDisplayedValue(confidence)}</output>
         </label>
-        <button className="button button--primary" disabled={!candidateId || confidence === null} onClick={() => candidateId && confidence !== null && onSelect(candidateId, confidence)}>{timeExpired ? '确认超时决策' : '提交最终录用'}</button>
+        <button type="button" className="button button--primary" disabled={!candidateId || confidence === null} onClick={() => candidateId && confidence !== null && onSelect(candidateId, confidence)}>{timeExpired ? '确认超时决策' : '提交最终录用'}</button>
         {!timeExpired && (
           <button className="text-button" onClick={onBack}>
             返回继续查证

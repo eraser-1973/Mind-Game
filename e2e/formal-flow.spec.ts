@@ -100,6 +100,17 @@ const rateAllT1 = async (page: Page) => {
   await page.getByRole('button', { name: '提交阶段判断' }).click()
 }
 
+const rateAllQuickT1 = async (page: Page) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /快速测试/ }).click()
+  for (const id of ['A', 'B', 'C', 'D', 'E']) {
+    await page.getByRole('button', { name: new RegExp(`候选人 ${id}`) }).first().click()
+    await page.getByLabel('T1 评分').fill(String(50 + id.charCodeAt(0) - 65))
+    await page.getByRole('button', { name: '提交并封存 T1' }).click()
+  }
+  await expect(page.getByRole('heading', { name: '记录当前首选与决策信心' })).toBeVisible()
+}
+
 const selectCandidate = async (page: Page, id: 'A' | 'B' | 'C' | 'D' | 'E') => {
   await page.getByRole('button', { name: new RegExp(`候选人 ${id}`) }).first().click()
 }
@@ -172,9 +183,108 @@ test('partially answered post-task items remain unanswered instead of using defa
   await enterFormalGame(page); await rateAllT1(page); await submitFinal(page)
   await page.locator('input[type="range"]').first().fill('7')
   await page.getByRole('button', { name: '继续' }).click()
-  await expect(page.getByText('未作答')).toHaveCount(4)
+  await expect(page.getByText('未作答')).toHaveCount(0)
+  await expect(page.locator('.scale-question__head strong', { hasText: /^0$/ })).toHaveCount(4)
   const snapshot = await readSnapshot(page)
   expect((snapshot?.researchData as { postTask: unknown }).postTask).toBeNull()
+})
+
+test('quick T1 snapshot appears once and tracks the selected candidate accessibly', async ({ page }) => {
+  await rateAllQuickT1(page)
+
+  const submit = page.getByRole('button', { name: '提交阶段判断' })
+  await expect(page.locator('.decision-modal output')).toHaveText('0')
+  await expect(page.getByText('未作答')).toHaveCount(0)
+  await expect(submit).toBeDisabled()
+
+  const candidateB = page.getByRole('button', { name: /选择候选人 B/ })
+  const candidateD = page.getByRole('button', { name: /选择候选人 D/ })
+  await candidateB.click()
+  await expect(candidateB).toHaveAttribute('aria-pressed', 'true')
+  await expect(candidateB).toHaveClass(/is-selected/)
+  await candidateD.click()
+  await expect(candidateD).toHaveAttribute('aria-pressed', 'true')
+  await expect(candidateD).toHaveClass(/is-selected/)
+  await expect(candidateB).toHaveAttribute('aria-pressed', 'false')
+  await expect(candidateB).not.toHaveClass(/is-selected/)
+
+  await page.getByLabel('T1 决策信心').fill('68')
+  await submit.click()
+  await expect(page.getByRole('heading', { name: '记录当前首选与决策信心' })).toHaveCount(0)
+
+  await selectCandidate(page, 'A')
+  await selectCandidate(page, 'C')
+  await page.getByRole('button', { name: '进入最终决策' }).click()
+  await expect(page.getByText('T1 DECISION SNAPSHOT')).toHaveCount(0)
+})
+
+test('final decision selection highlight switches and clears consistently after returning', async ({ page }) => {
+  await rateAllQuickT1(page)
+  await page.getByRole('button', { name: /选择候选人 B/ }).click()
+  await page.getByLabel('T1 决策信心').fill('65')
+  await page.getByRole('button', { name: '提交阶段判断' }).click()
+  await page.getByRole('button', { name: '进入最终决策' }).click()
+
+  const submit = page.getByRole('button', { name: '提交最终录用' })
+  await expect(submit).toBeDisabled()
+  const candidateC = page.getByRole('button', { name: /选择候选人 C/ })
+  const candidateA = page.getByRole('button', { name: /选择候选人 A/ })
+  await candidateC.click()
+  await expect(candidateC).toHaveAttribute('aria-pressed', 'true')
+  await expect(candidateC).toHaveClass(/is-selected/)
+  await candidateA.click()
+  await expect(candidateA).toHaveAttribute('aria-pressed', 'true')
+  await expect(candidateA).toHaveClass(/is-selected/)
+  await expect(candidateC).toHaveAttribute('aria-pressed', 'false')
+
+  const selectedBox = await candidateA.boundingBox()
+  const viewport = page.viewportSize()
+  expect(selectedBox).not.toBeNull()
+  expect(selectedBox!.x).toBeGreaterThanOrEqual(0)
+  expect(selectedBox!.x + selectedBox!.width).toBeLessThanOrEqual(viewport!.width)
+
+  await page.getByRole('button', { name: '返回继续查证' }).click()
+  await page.getByRole('button', { name: '进入最终决策' }).click()
+  await expect(page.locator('.decision-modal .decision-card[aria-pressed="true"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '提交最终录用' })).toBeDisabled()
+})
+
+test('decision selection remains visible and unclipped on a narrow viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await rateAllQuickT1(page)
+
+  const stageCandidate = page.getByRole('button', { name: /选择候选人 D/ })
+  await stageCandidate.click()
+  const stageCardBox = await stageCandidate.boundingBox()
+  const stageMarkBox = await stageCandidate.locator('.decision-card__selection').boundingBox()
+  expect(stageCardBox).not.toBeNull()
+  expect(stageMarkBox).not.toBeNull()
+  expect(stageCardBox!.x).toBeGreaterThanOrEqual(0)
+  expect(stageCardBox!.x + stageCardBox!.width).toBeLessThanOrEqual(390)
+  expect(stageMarkBox!.x + stageMarkBox!.width).toBeLessThanOrEqual(
+    stageCardBox!.x + stageCardBox!.width,
+  )
+
+  await page.getByLabel('T1 决策信心').fill('60')
+  await page.getByRole('button', { name: '提交阶段判断' }).click()
+  await page.getByRole('button', { name: '进入最终决策' }).click()
+  await page.getByRole('button', { name: /选择候选人 A/ }).click()
+
+  const submit = page.getByRole('button', { name: '提交最终录用' })
+  const back = page.getByRole('button', { name: '返回继续查证' })
+  await submit.scrollIntoViewIfNeeded()
+  await back.scrollIntoViewIfNeeded()
+  const submitBox = await submit.boundingBox()
+  const backBox = await back.boundingBox()
+  expect(submitBox).not.toBeNull()
+  expect(backBox).not.toBeNull()
+  const overlaps = !(
+    submitBox!.x + submitBox!.width <= backBox!.x ||
+    backBox!.x + backBox!.width <= submitBox!.x ||
+    submitBox!.y + submitBox!.height <= backBox!.y ||
+    backBox!.y + backBox!.height <= submitBox!.y
+  )
+  expect(overlaps).toBe(false)
 })
 
 test('unanswered manipulation-check items cannot generate a report', async ({ page }) => {

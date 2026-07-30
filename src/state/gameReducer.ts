@@ -211,6 +211,14 @@ export function gameReducer(
 
   if (action.type === 'CAPTURE_STAGE_SNAPSHOT') {
     if (!candidateById[action.preferredCandidateId]) return state
+    if (
+      action.stage === 'T1' &&
+      state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1')
+    ) {
+      return state.pendingSnapshotStage === 'T1'
+        ? { ...state, pendingSnapshotStage: null }
+        : state
+    }
     const snapshot: StageSnapshot = {
       eventId: action.eventId ?? `snapshot-${state.sessionId}-${action.stage}`,
       sessionId: state.sessionId,
@@ -318,6 +326,16 @@ export function gameReducer(
         [action.stage]: { value, elapsedSec: state.elapsedSec },
       },
     }
+    const nextRuntimeByCandidate = {
+      ...state.runtime,
+      [action.candidateId]: nextRuntime,
+    }
+    const shouldQueueT1Snapshot =
+      action.stage === 'T1' &&
+      !state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1') &&
+      candidates.every(
+        (candidate) => nextRuntimeByCandidate[candidate.id].ratings.T1,
+      )
     const log = makeLog(state, {
       type: 'rate',
       candidateId: action.candidateId,
@@ -336,14 +354,13 @@ export function gameReducer(
 
     return {
       ...state,
-      runtime: {
-        ...state.runtime,
-        [action.candidateId]: nextRuntime,
-      },
+      runtime: nextRuntimeByCandidate,
       logs: [...state.logs, log],
       ratingEvents: [...state.ratingEvents, ratingEvent],
       sunkCostEvents: updateLatestSunkCost(state.sunkCostEvents, (event) => ({ ...event, subsequentRatingChanges: event.subsequentRatingChanges + 1 })),
       lastActionElapsedSec: state.elapsedSec,
+      pendingSnapshotStage:
+        state.pendingSnapshotStage ?? (shouldQueueT1Snapshot ? 'T1' : null),
       notice: `${action.stage} 评分已封存；后续重评不会显示这次分数。`,
     }
   }
@@ -533,6 +550,13 @@ export function gameReducer(
       return {
         ...state,
         notice: '必须先完成 5 名候选人的 T1 初评。',
+      }
+    }
+
+    if (state.pendingSnapshotStage === 'T1') {
+      return {
+        ...state,
+        notice: '请先提交 T1 阶段的首选候选人与决策信心。',
       }
     }
 

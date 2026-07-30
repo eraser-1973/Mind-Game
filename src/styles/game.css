@@ -1547,21 +1547,66 @@ p {
 }
 
 .decision-card {
+  position: relative;
   display: flex;
+  box-sizing: border-box;
   min-height: 190px;
   flex-direction: column;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 2px solid transparent;
   border-radius: 4px;
   text-align: left;
   background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--line);
   cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.decision-card:hover {
+.decision-card:hover:not(.is-selected) {
   transform: translateY(-3px);
+  border-color: rgba(99, 221, 255, 0.35);
+  background: rgba(34, 137, 177, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(99, 221, 255, 0.28);
+}
+
+.decision-card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.88);
+  outline-offset: 3px;
+}
+
+.decision-card.is-selected {
   border-color: var(--cyan);
-  background: rgba(34, 137, 177, 0.1);
+  background: rgba(34, 137, 177, 0.14);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 230, 255, 0.24),
+    0 0 0 1px rgba(99, 221, 255, 0.14),
+    0 0 20px rgba(0, 188, 232, 0.22);
+}
+
+.decision-card__selection {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  padding: 0.22rem 0.38rem;
+  border: 1px solid rgba(99, 221, 255, 0.42);
+  border-radius: 3px;
+  color: var(--cyan);
+  background: rgba(5, 31, 48, 0.92);
+  font-size: 0.56rem;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+
+.decision-card.is-selected .decision-card__selection {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .decision-card > strong { margin-top: 1rem; font-size: 1rem; }

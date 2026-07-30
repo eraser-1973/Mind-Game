@@ -65,6 +65,8 @@ describe('ReportScreen', () => {
 
     expect(html).toContain('重新开始')
     expect(html).not.toContain('导出 JSON 数据')
+    expect(html).not.toContain('未作答')
+    expect(html).toContain('未触发或无记录')
   })
 
   it('labels manual final submissions separately from timeout submissions', () => {

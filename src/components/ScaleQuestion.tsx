@@ -1,3 +1,5 @@
+import { formatDisplayedValue } from '../utils/display'
+
 type Props = {
   id: string
   label: string
@@ -25,7 +27,7 @@ export function ScaleQuestion({
     <label className="scale-question" htmlFor={id}>
       <div className="scale-question__head">
         <span>{label}</span>
-        <strong>{value ?? '未作答'}</strong>
+        <strong>{formatDisplayedValue(value)}</strong>
       </div>
       <input
         id={id}

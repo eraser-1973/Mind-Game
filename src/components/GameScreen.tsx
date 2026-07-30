@@ -107,7 +107,6 @@ export function GameScreen({
   }, [state.phase])
 
   const initialRatingsComplete = allT1Rated(state)
-  const missingT1Snapshot = mode === 'formal' && initialRatingsComplete && !state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1')
   const showNikoFeedback =
     mode === 'quick' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]
@@ -194,7 +193,9 @@ export function GameScreen({
           candidate={selected}
           runtime={state.runtime[selected.id]}
           availablePoints={state.availablePoints}
-          investigationLocked={!initialRatingsComplete || missingT1Snapshot}
+          investigationLocked={
+            !initialRatingsComplete || state.pendingSnapshotStage === 'T1'
+          }
           mode={state.mode}
           pendingVerifyType={pendingVerifyType}
           onVerify={(verifyType) => verify(selected.id, verifyType)}
@@ -256,7 +257,9 @@ export function GameScreen({
         )}
         <button
           className="button button--primary button--compact"
-          disabled={!initialRatingsComplete}
+          disabled={
+            !initialRatingsComplete || state.pendingSnapshotStage === 'T1'
+          }
           onClick={() => dispatch({ type: 'OPEN_DECISION' })}
         >
           进入最终决策
@@ -297,11 +300,20 @@ export function GameScreen({
         />
       )}
 
-      {(missingT1Snapshot || state.pendingSnapshotStage) && (
+      {state.pendingSnapshotStage && (
         <StageSnapshotModal
-          stage={missingT1Snapshot ? 'T1' : state.pendingSnapshotStage!}
+          stage={state.pendingSnapshotStage}
           candidates={orderedCandidates}
-          onSubmit={(candidateId, confidence) => dispatch({ type: 'CAPTURE_STAGE_SNAPSHOT', stage: missingT1Snapshot ? 'T1' : state.pendingSnapshotStage!, preferredCandidateId: candidateId, confidence, eventId: createSessionEventId(), occurredAt: new Date().toISOString() })}
+          onSubmit={(candidateId, confidence) =>
+            dispatch({
+              type: 'CAPTURE_STAGE_SNAPSHOT',
+              stage: state.pendingSnapshotStage!,
+              preferredCandidateId: candidateId,
+              confidence,
+              eventId: createSessionEventId(),
+              occurredAt: new Date().toISOString(),
+            })
+          }
         />
       )}
     </main>
