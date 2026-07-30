@@ -54,6 +54,20 @@ export function GameScreen({
 
   useEffect(() => { onStateChange?.(state) }, [onStateChange, state])
 
+  useEffect(() => {
+    if (mode !== 'formal') return
+    const onTechnicalError = (event: Event) => {
+      const detail = (event as CustomEvent<{ message: string; occurredAt: string }>).detail
+      dispatch({
+        type: 'TECHNICAL_ERROR',
+        reason: detail.message,
+        occurredAt: detail.occurredAt,
+      })
+    }
+    window.addEventListener('mind-game:technical-error', onTechnicalError)
+    return () => window.removeEventListener('mind-game:technical-error', onTechnicalError)
+  }, [mode])
+
   const verify = (candidateId: string, verifyType: VerifyType) => {
     if (verificationInFlightRef.current) return
     verificationInFlightRef.current = true
@@ -81,7 +95,7 @@ export function GameScreen({
   }, [state.phase])
 
   const initialRatingsComplete = allT1Rated(state)
-  const missingT1Snapshot = initialRatingsComplete && !state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1')
+  const missingT1Snapshot = mode === 'formal' && initialRatingsComplete && !state.stageSnapshots.some((snapshot) => snapshot.stage === 'T1')
   const showNikoFeedback =
     mode === 'quick' && initialRatingsComplete
   const selected = candidateById[state.selectedCandidateId]

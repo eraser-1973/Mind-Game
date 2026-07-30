@@ -68,6 +68,17 @@ export function ReportScreen({ report, onRestart, sourceState }: Props) {
         </div>
       </header>
 
+      {report.invalidForAssessment && (
+        <section className="report-card report-section technical-invalid-notice" role="alert">
+          <span className="eyebrow">TECHNICAL VALIDITY NOTICE</span>
+          <h2>本次结果不作为有效测评数据</h2>
+          <p>
+            本次会话受到技术问题影响，结果不适合作为有效测评数据。技术故障不会被解释为低能力、低注意力或低韧性。
+          </p>
+          {report.invalidReason && <small>技术记录：{report.invalidReason}</small>}
+        </section>
+      )}
+
       <section className="report-grid report-grid--lead">
         <article className="report-card selected-result">
           <span className="eyebrow">最终录用</span>

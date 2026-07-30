@@ -55,6 +55,8 @@ export type GameAction =
   | { type: 'FINAL_SELECT'; candidateId: string; confidence?: number; submissionType?: SubmissionType; nowMs: number; eventId?: string; occurredAt?: string }
   | { type: 'DISMISS_NOTICE' }
   | { type: 'NIKO_FEEDBACK'; message: NikoMessage }
+  | { type: 'TECHNICAL_ERROR'; reason: string; occurredAt?: string }
+  | { type: 'TECHNICAL_RESUME'; occurredAt?: string }
 
 const createRuntimeState = (
   candidateId: string,
@@ -116,6 +118,10 @@ export function createInitialGameState(
     sunkCostEvents: [],
     finalDecision: null,
     pendingSnapshotStage: null,
+    invalidForAssessment: false,
+    invalidReason: null,
+    technicalPauseStartedAt: null,
+    technicalPauseMs: 0,
   }
 }
 
@@ -178,6 +184,31 @@ export function gameReducer(
   state: GameState,
   action: GameAction,
 ): GameState {
+  if (action.type === 'TECHNICAL_ERROR') {
+    return {
+      ...state,
+      invalidForAssessment: true,
+      invalidReason: action.reason,
+      technicalPauseStartedAt:
+        state.technicalPauseStartedAt ?? action.occurredAt ?? new Date().toISOString(),
+    }
+  }
+
+  if (action.type === 'TECHNICAL_RESUME') {
+    if (!state.technicalPauseStartedAt) return state
+    const endedAt = action.occurredAt ?? new Date().toISOString()
+    const pauseMs = Math.max(
+      0,
+      Date.parse(endedAt) - Date.parse(state.technicalPauseStartedAt),
+    )
+    return {
+      ...state,
+      technicalPauseStartedAt: null,
+      technicalPauseMs: state.technicalPauseMs + pauseMs,
+      activeViewStartedAtMs: Date.now(),
+    }
+  }
+
   if (action.type === 'CAPTURE_STAGE_SNAPSHOT') {
     if (!candidateById[action.preferredCandidateId]) return state
     const snapshot: StageSnapshot = {
@@ -504,6 +535,7 @@ export function gameReducer(
       }
     }
 
+    if (state.mode === 'quick') return { ...state, phase: 'decision', notice: null }
     const requestedStage = state.evidenceEvents.some((event) => event.verifyType === 'deep') ? 'T3' : state.evidenceEvents.some((event) => event.verifyType === 'shallow') ? 'T2' : null
     if (requestedStage && !state.stageSnapshots.some((snapshot) => snapshot.stage === requestedStage)) return { ...state, pendingSnapshotStage: requestedStage, notice: null }
     return { ...state, phase: 'decision', notice: null }

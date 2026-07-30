@@ -111,6 +111,41 @@ describe('formal session Worker API', () => {
     expect(identifiable.status).toBe(400)
   })
 
+  it('authenticates fatal client errors and invalidates the affected session', async () => {
+    const repository = new MemoryRepository()
+    const handler = createApiHandler(repository)
+    const created = await createSession(handler)
+    const errorId = 'error-technical-001'
+    const unauthorized = await handler(jsonRequest('https://test/api/client-errors', 'POST', {
+      errorId,
+      sessionId: created.data.sessionId,
+      errorType: 'react_boundary',
+      message: 'render failed',
+      occurredAt: new Date().toISOString(),
+      appVersion: '1.0.0',
+      fatal: true,
+      affectedAssessment: true,
+    }))
+    expect(unauthorized.status).toBe(401)
+
+    const accepted = await handler(jsonRequest('https://test/api/client-errors', 'POST', {
+      errorId,
+      sessionId: created.data.sessionId,
+      errorType: 'react_boundary',
+      message: 'render failed',
+      occurredAt: new Date().toISOString(),
+      appVersion: '1.0.0',
+      fatal: true,
+      affectedAssessment: true,
+    }, created.data.recoveryToken))
+    expect(accepted.status).toBe(200)
+    expect(repository.errors.size).toBe(1)
+    expect(repository.sessions.get(created.data.sessionId)).toMatchObject({
+      status: 'technical_error',
+      invalidForAssessment: 1,
+    })
+  })
+
   it('prevents duplicate completion and new events after completion', async () => {
     const repository = new MemoryRepository()
     const handler = createApiHandler(repository)

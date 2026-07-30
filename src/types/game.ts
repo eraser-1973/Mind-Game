@@ -360,6 +360,10 @@ export type GameState = {
   sunkCostEvents: SunkCostEvent[]
   finalDecision: FinalDecision | null
   pendingSnapshotStage: RatingStage | null
+  invalidForAssessment: boolean
+  invalidReason: string | null
+  technicalPauseStartedAt: string | null
+  technicalPauseMs: number
 }
 
 export type ROIResult = {
@@ -395,7 +399,7 @@ export type RDIInput = {
 
 export type RDIResult = {
   score: number
-  level: '高韧性' | '中间型' | '脆弱型'
+  level: '高韧性' | '中间型' | '脆弱型' | '技术无效'
   explanation: string
   rawData: RDIInput
 }
@@ -421,4 +425,6 @@ export type ReportData = {
   participantId: string | null
   researchData: ResearchData | null
   nikoMessages: NikoMessage[]
+  invalidForAssessment: boolean
+  invalidReason: string | null
 }

@@ -81,4 +81,12 @@ describe('generateReport', () => {
     expect(report.researchData?.consent.accepted).toBe(true)
     expect(report.nikoMessages).toEqual([])
   })
+
+  it('marks a technical-error session invalid instead of assigning a resilience level', () => {
+    const state = { ...createInitialGameState('formal', 1_000), finalCandidateId: 'B', invalidForAssessment: true, invalidReason: 'resource_load_failed' }
+    const report = generateReport(state)
+    expect(report.invalidForAssessment).toBe(true)
+    expect(report.invalidReason).toBe('resource_load_failed')
+    expect(report.rdi.level).toBe('技术无效')
+  })
 })

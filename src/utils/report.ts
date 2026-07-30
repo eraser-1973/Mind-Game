@@ -44,7 +44,7 @@ export function generateReport(state: GameState): ReportData {
   const attention = detectAttentionDisengagementFailure(state.logs)
   const strategy = classifyStrategy(state.logs)
   const revisionQuality = calculateRevisionQuality(revisions)
-  const rdi = calculateRDI({
+  const calculatedRdi = calculateRDI({
     selectedAbility: selectedCandidate.trueAbility,
     selectedFit: selectedCandidate.trueFit,
     attentionFailed: attention.failed,
@@ -52,6 +52,15 @@ export function generateReport(state: GameState): ReportData {
     lossChoice: state.sunkCostChoice,
     revisionQuality,
   })
+  const rdi = state.invalidForAssessment
+    ? {
+        ...calculatedRdi,
+        score: 0,
+        level: '技术无效' as const,
+        explanation:
+          '本次会话受到技术问题影响，结果不适合作为有效测评数据。技术故障期间的反应时间不会被解释为能力、注意力或韧性表现。',
+      }
+    : calculatedRdi
 
   return {
     generatedAt: new Date().toISOString(),
@@ -77,5 +86,7 @@ export function generateReport(state: GameState): ReportData {
     participantId: state.participantId,
     researchData: state.researchData,
     nikoMessages: state.nikoMessages,
+    invalidForAssessment: state.invalidForAssessment,
+    invalidReason: state.invalidReason,
   }
 }

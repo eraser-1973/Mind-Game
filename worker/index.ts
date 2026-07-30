@@ -76,6 +76,7 @@ export function createApiHandler(repository: FormalSessionRepository) {
         const body = await parseBody(request); validateAnonymous(body)
         if (!EVENT_ID.test(String(body.errorId ?? '')) || typeof body.message !== 'string' || typeof body.errorType !== 'string') throw apiError(400, 'INVALID_CLIENT_ERROR', '错误记录字段无效。')
         const sessionId = typeof body.sessionId === 'string' ? body.sessionId : null
+        if (sessionId) await authorize(request, repository, sessionId)
         await repository.insertClientError({ errorId: String(body.errorId), sessionId, errorType: String(body.errorType), message: String(body.message).slice(0, 2000), stack: typeof body.stack === 'string' ? body.stack.slice(0, 8000) : null, route: typeof body.route === 'string' ? body.route : null, occurredAt: String(body.occurredAt ?? new Date().toISOString()), appVersion: String(body.appVersion ?? ''), fatal: body.fatal ? 1 : 0, affectedAssessment: body.affectedAssessment ? 1 : 0, payloadJson: JSON.stringify(body.payload ?? null) })
         if (sessionId && body.fatal) await repository.updateSession(sessionId, { status: 'technical_error', invalidForAssessment: 1, invalidReason: String(body.message).slice(0, 500), updatedAt: new Date().toISOString() })
         return ok({ accepted: true })
