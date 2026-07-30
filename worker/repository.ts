@@ -104,7 +104,7 @@ const mapSession = (row: Record<string, unknown>): SessionRow => ({
 export function createD1Repository(db: D1DatabaseLike): FormalSessionRepository {
   return {
     async createSession(row) {
-      await db.prepare(`INSERT INTO sessions (session_id, ${SESSION_DB_COLUMNS.join(', ')}) VALUES (${Array(18).fill('?').join(', ')})`)
+      await db.prepare(`INSERT INTO sessions (session_id, ${SESSION_DB_COLUMNS.join(', ')}) VALUES (${Array(SESSION_DB_COLUMNS.length + 1).fill('?').join(', ')})`)
         .bind(row.sessionId, ...SESSION_COLUMNS.map((key) => row[key])).run()
     },
     async getSession(sessionId) {
