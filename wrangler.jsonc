@@ -1,8 +1,22 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mindgame1",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-07-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mind-game-production",
+      "database_id": "6670f515-5f55-4f9a-aded-d4cf2092fabb",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

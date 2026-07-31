@@ -1,5 +1,11 @@
 node_modules/
 dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 playtest-artifacts/
 doc-preview-pressure/
 *.tsbuildinfo
