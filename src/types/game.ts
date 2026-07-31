@@ -4,16 +4,62 @@ export type PressureStage = 'green' | 'orange' | 'red'
 export type SunkCostChoice = 'continue' | 'stop_loss' | 'give_up' | null
 export type GamePhase = 'start' | 'playing' | 'decision' | 'report'
 export type GameMode = 'formal' | 'quick'
+export type PublicCandidateId = 'A' | 'B' | 'C' | 'D' | 'E'
+export type CandidateDisplayOrder = [
+  PublicCandidateId,
+  PublicCandidateId,
+  PublicCandidateId,
+  PublicCandidateId,
+  PublicCandidateId,
+]
 export type EvidencePolarity = 'positive' | 'negative'
 export type RatingDirection = 'higher' | 'lower'
 export type NikoMood = 'happy' | 'angry'
 export type ResearchStep =
   | 'consent'
+  | 'identity'
   | 'demographics'
   | 'preTask'
   | 'postTask'
   | 'taskExperience'
   | 'report'
+
+export type FormalIdentityInput = {
+  fullName?: string | null
+  studentId?: string | null
+  phone?: string | null
+}
+
+export type FormalSessionVersions = {
+  task: string
+  material: string
+  pointRule: string
+  scoring: string
+  benchmark: string
+  norm: string | null
+}
+
+export type FormalSessionContext = {
+  participantId: string
+  sessionId: string
+  configSetId: string
+  versions: FormalSessionVersions
+  candidateDisplayOrder: CandidateDisplayOrder
+  initialOpenedCandidate: PublicCandidateId
+  createdAt: string
+}
+
+export type CreateFormalSessionRequest = {
+  mode: 'formal'
+  identity: FormalIdentityInput
+  clientVersion: string
+}
+
+export type CreateFormalSessionResponse = FormalSessionContext & {
+  created: boolean
+  mode: 'formal'
+  currentStep: 'demographics'
+}
 
 export type Evidence = {
   id: string
@@ -187,6 +233,7 @@ export type TaskExperienceData = Record<TaskExperienceId, number>
 
 export type ResearchData = {
   participantId: string
+  formalSession: FormalSessionContext | null
   consent: ConsentRecord
   demographics: DemographicData | null
   preTask: StateAssessmentData | null

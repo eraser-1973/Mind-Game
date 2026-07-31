@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { defaultDemographics } from '../data/researchFlow'
-import { createResearchData } from '../utils/researchData'
 import { ConsentScreen } from './ConsentScreen'
 import { DemographicForm } from './DemographicForm'
 import { StateAssessmentScreen } from './StateAssessmentScreen'
@@ -9,10 +8,8 @@ import { TaskExperienceScreen } from './TaskExperienceScreen'
 
 describe('research flow screens', () => {
   it('renders the informed consent copy and keeps start disabled by default', () => {
-    const research = createResearchData(new Date('2026-07-26T00:00:00.000Z'))
     const html = renderToStaticMarkup(
       <ConsentScreen
-        participantId={research.participantId}
         onAccept={() => undefined}
         onExit={() => undefined}
       />,
@@ -20,7 +17,11 @@ describe('research flow screens', () => {
 
     expect(html).toContain('参与知情同意书')
     expect(html).toContain('我已阅读并理解上述说明，并自愿参与本研究。')
-    expect(html).toContain('姓名、手机号、邮箱、学号、IP')
+    expect(html).toContain('姓名、学号、手机号中的至少一项')
+    expect(html).toContain('身份信息与测评过程数据将分表保存')
+    expect(html).toContain('只有授权研究管理员可以访问和导出')
+    expect(html).toContain('快速测试模式不会上传身份信息或游戏记录')
+    expect(html).not.toContain('本流程不收集姓名')
     expect(html).toContain('disabled=""')
   })
 

@@ -74,6 +74,29 @@ describe('researchData utilities', () => {
   it('builds export data with questionnaires, game logs, Niko messages and report metrics', () => {
     const research = {
       ...createResearchData(new Date('2026-07-26T00:00:00.000Z')),
+      participantId: '11111111-1111-4111-8111-111111111111',
+      formalSession: {
+        participantId: '11111111-1111-4111-8111-111111111111',
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        configSetId: 'config-2026-07-v1',
+        versions: {
+          task: 'task-1.0.0',
+          material: 'material-1.0.0',
+          pointRule: 'points-5-v1',
+          scoring: 'RDI-2.0-prepilot',
+          benchmark: 'benchmark-1.0.0',
+          norm: null,
+        },
+        candidateDisplayOrder: ['C', 'A', 'E', 'B', 'D'] as [
+          'C',
+          'A',
+          'E',
+          'B',
+          'D',
+        ],
+        initialOpenedCandidate: 'C' as const,
+        createdAt: '2026-07-31T00:00:00.000Z',
+      },
       consent: {
         accepted: true,
         acceptedAt: '2026-07-26T00:00:01.000Z',

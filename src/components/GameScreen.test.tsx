@@ -17,7 +17,42 @@ vi.mock('../state/gameReducer', async () => {
     complete: boolean,
     mode: 'quick' | 'formal' = 'quick',
   ) => {
-    const state = actual.createInitialGameState(mode, 1_000)
+    const formalResearch =
+      mode === 'formal'
+        ? {
+            participantId: '11111111-1111-4111-8111-111111111111',
+            formalSession: {
+              participantId: '11111111-1111-4111-8111-111111111111',
+              sessionId: '22222222-2222-4222-8222-222222222222',
+              configSetId: 'config-2026-07-v1',
+              versions: {
+                task: 'task-1.0.0',
+                material: 'material-1.0.0',
+                pointRule: 'points-5-v1',
+                scoring: 'RDI-2.0-prepilot',
+                benchmark: 'benchmark-1.0.0',
+                norm: null,
+              },
+              candidateDisplayOrder: ['D', 'B', 'E', 'A', 'C'] as [
+                'D',
+                'B',
+                'E',
+                'A',
+                'C',
+              ],
+              initialOpenedCandidate: 'D' as const,
+              createdAt: '2026-07-31T00:00:00.000Z',
+            },
+            consent: { accepted: true, acceptedAt: '2026-07-31T00:00:00.000Z' },
+            demographics: null,
+            preTask: null,
+            postTask: null,
+            taskExperience: null,
+            startedAt: '2026-07-31T00:00:00.000Z',
+            completedAt: null,
+          }
+        : null
+    const state = actual.createInitialGameState(mode, 1_000, formalResearch)
 
     if (complete) {
       for (const candidateId of Object.keys(state.runtime)) {

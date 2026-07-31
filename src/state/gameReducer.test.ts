@@ -1,36 +1,78 @@
 import { describe, expect, it } from 'vitest'
+import type { FormalSessionContext, ResearchData } from '../types/game'
 import { createInitialGameState, gameReducer } from './gameReducer'
+
+const formalSession: FormalSessionContext = {
+  participantId: '11111111-1111-4111-8111-111111111111',
+  sessionId: '22222222-2222-4222-8222-222222222222',
+  configSetId: 'config-2026-07-v1',
+  versions: {
+    task: 'task-1.0.0',
+    material: 'material-1.0.0',
+    pointRule: 'points-5-v1',
+    scoring: 'RDI-2.0-prepilot',
+    benchmark: 'benchmark-1.0.0',
+    norm: null,
+  },
+  candidateDisplayOrder: ['D', 'B', 'E', 'A', 'C'],
+  initialOpenedCandidate: 'D',
+  createdAt: '2026-07-31T00:00:00.000Z',
+}
+
+const formalResearchData: ResearchData = {
+  participantId: formalSession.participantId,
+  formalSession,
+  consent: {
+    accepted: true,
+    acceptedAt: '2026-07-26T00:00:00.000Z',
+  },
+  demographics: null,
+  preTask: null,
+  postTask: null,
+  taskExperience: null,
+  startedAt: '2026-07-26T00:00:00.000Z',
+  completedAt: null,
+}
 
 describe('gameReducer', () => {
   it('can attach anonymous research data to a formal game session', () => {
-    const researchData = {
-      participantId: 'MG-TEST-123',
-      consent: {
-        accepted: true,
-        acceptedAt: '2026-07-26T00:00:00.000Z',
-      },
-      demographics: null,
-      preTask: null,
-      postTask: null,
-      taskExperience: null,
-      startedAt: '2026-07-26T00:00:00.000Z',
-      completedAt: null,
-    }
-    const initial = createInitialGameState('formal', 1_000, researchData)
+    const initial = createInitialGameState('formal', 1_000, formalResearchData)
 
-    expect(initial.participantId).toBe('MG-TEST-123')
+    expect(initial.participantId).toBe(formalSession.participantId)
     expect(initial.researchData?.consent.accepted).toBe(true)
     expect(initial.durationSec).toBe(900)
+    expect(initial.candidateDisplayOrder).toEqual(
+      formalSession.candidateDisplayOrder,
+    )
+    expect(initial.selectedCandidateId).toBe('D')
+  })
+
+  it('rejects formal initialization without a valid server session context', () => {
+    expect(() => createInitialGameState('formal', 1_000)).toThrow(
+      '正式测评缺少有效的服务器会话',
+    )
+  })
+
+  it('keeps quick mode on browser-side random ordering', () => {
+    const initial = createInitialGameState('quick', 1_000)
+    expect(initial.candidateDisplayOrder.slice().sort()).toEqual([
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+    ])
+    expect(initial.participantId).toBeNull()
   })
 
   it('starts without Niko feedback messages', () => {
-    const initial = createInitialGameState('formal', 1_000)
+    const initial = createInitialGameState('formal', 1_000, formalResearchData)
 
     expect(initial.nikoMessages).toEqual([])
   })
 
   it('adds Niko feedback and replaces the same evidence-stage message', () => {
-    const initial = createInitialGameState('formal', 1_000)
+    const initial = createInitialGameState('formal', 1_000, formalResearchData)
     const happyMessage = {
       id: 'niko-C-T2-C-shallow',
       candidateId: 'C',

@@ -18,6 +18,7 @@ import {
   QUICK_DURATION_SEC,
 } from '../utils/time'
 import { shuffleCandidateIds } from '../utils/candidateOrder'
+import { isFormalSessionContext } from '../utils/formalSessionContext'
 
 export type GameAction =
   | {
@@ -66,9 +67,18 @@ export function createInitialGameState(
 ): GameState {
   const durationSec =
     mode === 'quick' ? QUICK_DURATION_SEC : FORMAL_DURATION_SEC
-  const candidateDisplayOrder = shuffleCandidateIds(
-    candidates.map((candidate) => candidate.id),
-  )
+  const formalSession = researchData?.formalSession
+  if (
+    mode === 'formal' &&
+    (!isFormalSessionContext(formalSession) ||
+      researchData?.participantId !== formalSession.participantId)
+  ) {
+    throw new Error('正式测评缺少有效的服务器会话和候选人顺序。')
+  }
+  const candidateDisplayOrder =
+    mode === 'formal' && formalSession
+      ? [...formalSession.candidateDisplayOrder]
+      : shuffleCandidateIds(candidates.map((candidate) => candidate.id))
 
   return {
     phase: 'playing',
@@ -78,7 +88,8 @@ export function createInitialGameState(
     elapsedSec: 0,
     availablePoints: 5,
     candidateDisplayOrder,
-    selectedCandidateId: candidates[0].id,
+    selectedCandidateId:
+      mode === 'formal' ? candidateDisplayOrder[0] : candidates[0].id,
     runtime: Object.fromEntries(
       candidates.map((candidate) => [
         candidate.id,

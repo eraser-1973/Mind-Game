@@ -5,13 +5,11 @@ import {
 } from '../data/researchFlow'
 
 type Props = {
-  participantId: string
   onAccept: () => void
   onExit: () => void
 }
 
 export function ConsentScreen({
-  participantId,
   onAccept,
   onExit,
 }: Props) {
@@ -20,11 +18,8 @@ export function ConsentScreen({
   return (
     <main className="research-screen">
       <section className="research-card research-card--wide">
-        <span className="eyebrow">ANONYMOUS RESEARCH FLOW</span>
+        <span className="eyebrow">FORMAL RESEARCH FLOW</span>
         <h1>{informedConsentTitle}</h1>
-        <p className="research-card__lead">
-          匿名编号：<strong>{participantId}</strong>
-        </p>
         <div className="consent-copy">
           {informedConsentParagraphs.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
@@ -51,7 +46,7 @@ export function ConsentScreen({
           </button>
         </div>
         <p className="privacy-note">
-          本流程不收集姓名、手机号、邮箱、学号、IP 或其他可直接识别身份的信息。
+          正式测评会收集您主动填写的姓名、学号或手机号；系统不要求邮箱，也不会将身份内容写入浏览器游戏记录。请在确认理解后自愿选择是否参与。
         </p>
       </section>
     </main>

@@ -39,6 +39,7 @@ describe('generateReport', () => {
   it('builds explanatory metrics and preserves raw runtime data', () => {
     const researchData = {
       participantId: 'MG-REPORT-001',
+      formalSession: null,
       consent: {
         accepted: true,
         acceptedAt: '2026-07-26T00:00:00.000Z',

@@ -15,8 +15,13 @@ export function jsonResponse(
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-export function successResponse<T>(data: T, requestId: string): Response {
-  return jsonResponse({ ok: true, data, requestId })
+export function successResponse<T>(
+  data: T,
+  requestId: string,
+  status = 200,
+  extraHeaders?: HeadersInit,
+): Response {
+  return jsonResponse({ ok: true, data, requestId }, status, extraHeaders)
 }
 
 export function errorResponse(

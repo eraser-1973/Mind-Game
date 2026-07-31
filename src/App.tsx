@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { ConsentScreen } from './components/ConsentScreen'
 import { DemographicForm } from './components/DemographicForm'
 import { GameScreen } from './components/GameScreen'
+import { IdentityForm } from './components/IdentityForm'
 import { ReportScreen } from './components/ReportScreen'
 import { StartScreen } from './components/StartScreen'
 import { StateAssessmentScreen } from './components/StateAssessmentScreen'
 import { TaskExperienceScreen } from './components/TaskExperienceScreen'
 import type {
   DemographicData,
+  FormalIdentityInput,
+  FormalSessionContext,
   GameMode,
   GameState,
   ResearchData,
@@ -17,6 +20,15 @@ import type {
 } from './types/game'
 import { createResearchData } from './utils/researchData'
 import { generateReport } from './utils/report'
+import { createFormalSession } from './api/formalSessions'
+import {
+  clearPendingCreationKey,
+  getOrCreatePendingCreationKey,
+  saveFormalSessionContext,
+} from './utils/formalSessionStorage'
+import { isFormalSessionContext } from './utils/formalSessionContext'
+
+const CLIENT_VERSION = import.meta.env.VITE_COMMIT_SHA ?? 'web-1.0.0'
 
 export default function App() {
   const [mode, setMode] = useState<GameMode | null>(null)
@@ -30,6 +42,7 @@ export default function App() {
     useState<GameState | null>(null)
 
   const resetSession = () => {
+    clearPendingCreationKey()
     setMode(null)
     setResearchStep(null)
     setResearchData(null)
@@ -66,7 +79,6 @@ export default function App() {
     if (researchStep === 'consent') {
       return (
         <ConsentScreen
-          participantId={researchData.participantId}
           onExit={resetSession}
           onAccept={() => {
             updateResearch((current) => ({
@@ -75,6 +87,43 @@ export default function App() {
                 accepted: true,
                 acceptedAt: new Date().toISOString(),
               },
+            }))
+            setResearchStep('identity')
+          }}
+        />
+      )
+    }
+
+    if (researchStep === 'identity') {
+      return (
+        <IdentityForm
+          onBack={() => setResearchStep('consent')}
+          onSubmit={async (identity: FormalIdentityInput) => {
+            const creationKey = getOrCreatePendingCreationKey()
+            const created = await createFormalSession(
+              {
+                mode: 'formal',
+                identity,
+                clientVersion: CLIENT_VERSION,
+              },
+              creationKey,
+            )
+            const formalSession: FormalSessionContext = {
+              participantId: created.participantId,
+              sessionId: created.sessionId,
+              configSetId: created.configSetId,
+              versions: created.versions,
+              candidateDisplayOrder: created.candidateDisplayOrder,
+              initialOpenedCandidate: created.initialOpenedCandidate,
+              createdAt: created.createdAt,
+            }
+
+            saveFormalSessionContext(formalSession)
+            clearPendingCreationKey()
+            updateResearch((current) => ({
+              ...current,
+              participantId: formalSession.participantId,
+              formalSession,
             }))
             setResearchStep('demographics')
           }}
@@ -164,6 +213,29 @@ export default function App() {
         />
       )
     }
+  }
+
+  if (
+    mode === 'formal' &&
+    researchStep === null &&
+    (!researchData || !isFormalSessionContext(researchData.formalSession))
+  ) {
+    return (
+      <main className="research-screen">
+        <section className="research-card">
+          <span className="eyebrow">FORMAL SESSION ERROR</span>
+          <h1>正式测评初始化失败</h1>
+          <p className="research-card__lead">
+            未找到有效的服务器会话和候选人顺序。为避免生成无效研究数据，本次正式测评不会继续。
+          </p>
+          <div className="research-actions">
+            <button className="button button--primary" onClick={resetSession}>
+              返回入口
+            </button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (

@@ -427,13 +427,35 @@ p {
   letter-spacing: 0.08em;
 }
 
-.research-field select {
+.research-field select,
+.research-field input {
   min-height: 46px;
   padding: 0 0.85rem;
   border: 1px solid var(--line);
   border-radius: 4px;
   color: var(--text);
   background: rgba(10, 27, 45, 0.96);
+}
+
+.research-field input:focus-visible {
+  border-color: var(--cyan);
+  outline: 2px solid rgba(99, 221, 255, 0.2);
+  outline-offset: 1px;
+}
+
+.identity-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.research-error {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 173, 92, 0.45);
+  color: #ffd0a3;
+  background: rgba(96, 47, 15, 0.24);
+  line-height: 1.55;
 }
 
 .research-fieldset {

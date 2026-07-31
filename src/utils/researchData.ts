@@ -26,6 +26,7 @@ export function createParticipantId(now = Date.now()): string {
 export function createResearchData(now = new Date()): ResearchData {
   return {
     participantId: createParticipantId(now.getTime()),
+    formalSession: null,
     consent: {
       accepted: false,
       acceptedAt: null,
