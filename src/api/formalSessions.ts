@@ -35,6 +35,7 @@ function parseSuccessData(value: unknown): CreateFormalSessionResponse | null {
     versions: value.versions,
     candidateDisplayOrder: value.candidateDisplayOrder,
     initialOpenedCandidate: value.initialOpenedCandidate,
+    currentStep: value.currentStep,
     createdAt: value.createdAt,
   }
 
@@ -42,7 +43,7 @@ function parseSuccessData(value: unknown): CreateFormalSessionResponse | null {
     !isFormalSessionContext(context) ||
     typeof value.created !== 'boolean' ||
     value.mode !== 'formal' ||
-    value.currentStep !== 'demographics'
+    value.currentStep !== 'consent_pending'
   ) {
     return null
   }
@@ -51,7 +52,6 @@ function parseSuccessData(value: unknown): CreateFormalSessionResponse | null {
     ...context,
     created: value.created,
     mode: 'formal',
-    currentStep: 'demographics',
   }
 }
 

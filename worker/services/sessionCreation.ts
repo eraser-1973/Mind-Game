@@ -121,7 +121,7 @@ export async function createOrReplayFormalSession(
         },
         candidateDisplayOrder,
         initialOpenedCandidate: candidateDisplayOrder[0],
-        currentStep: 'demographics',
+        currentStep: 'consent_pending',
         createdAt,
       },
     }

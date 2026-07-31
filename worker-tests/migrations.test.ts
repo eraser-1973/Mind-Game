@@ -48,7 +48,9 @@ describe('0001 infrastructure migration', () => {
 
 describe('0002 participant and formal session migration', () => {
   it('creates the five Stage 2 tables and advances the schema version', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({
+      throughMigration: '0002_participants_sessions.sql',
+    })
     runtime = created.runtime
     const tables = await created.db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
@@ -218,5 +220,173 @@ describe('0002 participant and formal session migration', () => {
       ).first<{ count: number }>()
       expect(count?.count).toBe(0)
     }
+  })
+})
+
+describe('0003 research intake and resume migration', () => {
+  it('creates the Stage 3 intake tables and advances the schema version', async () => {
+    const created = await createWorkerRuntime()
+    runtime = created.runtime
+    const tables = await created.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    ).all<{ name: string }>()
+    const schemaVersion = await created.db.prepare(
+      "SELECT value FROM app_metadata WHERE key = 'schema_version'",
+    ).first<{ value: string }>()
+
+    expect(tables.results.map((row) => row.name)).toEqual(
+      expect.arrayContaining([
+        'consent_records',
+        'demographic_revisions',
+        'questionnaire_submissions',
+        'questionnaire_answers',
+      ]),
+    )
+    expect(schemaVersion?.value).toBe('3')
+  })
+
+  it('enforces consent, demographic revision, and questionnaire integrity', async () => {
+    const created = await createWorkerRuntime()
+    runtime = created.runtime
+    const now = '2026-08-01T00:00:00.000Z'
+    await created.db.batch([
+      created.db.prepare(
+        'INSERT INTO participants (participant_id, created_at) VALUES (?, ?)',
+      ).bind('participant-stage-3', now),
+      created.db.prepare(
+        `INSERT INTO participant_identity (
+          participant_id, full_name, created_at, updated_at
+        ) VALUES (?, ?, ?, ?)`,
+      ).bind('participant-stage-3', 'Migration Test', now, now),
+      created.db.prepare(
+        `INSERT INTO sessions (
+          session_id, participant_id, creation_key, mode, config_set_id,
+          task_version, material_version, point_rule_version, scoring_version,
+          benchmark_version, candidate_display_order, initial_opened_candidate,
+          completion_status, current_step, final_submit_mode, created_at
+        ) VALUES (?, ?, ?, 'formal', ?, ?, ?, ?, ?, ?, json(?), ?, ?, ?, ?, ?)`,
+      ).bind(
+        'session-stage-3',
+        'participant-stage-3',
+        '00000000-0000-4000-8000-000000000003',
+        'config-2026-07-v1',
+        'task-1.0.0',
+        'material-1.0.0',
+        'points-5-v1',
+        'RDI-2.0-prepilot',
+        'benchmark-1.0.0',
+        '["A","B","C","D","E"]',
+        'A',
+        'in_progress',
+        'consent_pending',
+        'none',
+        now,
+      ),
+    ])
+
+    await created.db.prepare(
+      `INSERT INTO consent_records (
+        consent_id, event_id, session_id, consent_version, accepted,
+        client_accepted_at, server_accepted_at
+      ) VALUES (?, ?, ?, ?, 1, ?, ?)`,
+    ).bind('consent-1', crypto.randomUUID(), 'session-stage-3', 'consent-1.0.0', now, now).run()
+
+    await expect(
+      created.db.prepare(
+        `INSERT INTO consent_records (
+          consent_id, event_id, session_id, consent_version, accepted,
+          client_accepted_at, server_accepted_at
+        ) VALUES (?, ?, ?, ?, 0, ?, ?)`,
+      ).bind('consent-2', crypto.randomUUID(), 'session-stage-3', 'consent-1.0.0', now, now).run(),
+    ).rejects.toThrow()
+
+    await created.db.prepare(
+      `INSERT INTO demographic_revisions (
+        demographic_revision_id, event_id, session_id, revision_no, is_current,
+        age_range, gender, education, grade, major_category,
+        related_experience_json, client_submitted_at, server_submitted_at
+      ) VALUES (?, ?, ?, 1, 1, ?, ?, ?, ?, ?, json(?), ?, ?)`,
+    ).bind(
+      'demographic-1',
+      crypto.randomUUID(),
+      'session-stage-3',
+      '18–20',
+      '不愿透露',
+      '本科',
+      '大一',
+      '心理学',
+      '["无相关经历"]',
+      now,
+      now,
+    ).run()
+
+    await expect(
+      created.db.prepare(
+        `INSERT INTO demographic_revisions (
+          demographic_revision_id, event_id, session_id, revision_no, is_current,
+          age_range, gender, education, grade, major_category,
+          related_experience_json, client_submitted_at, server_submitted_at
+        ) VALUES (?, ?, ?, 2, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        'demographic-2',
+        crypto.randomUUID(),
+        'session-stage-3',
+        '21–23',
+        '男',
+        '本科',
+        '大二',
+        '理工科',
+        'not-json',
+        now,
+        now,
+      ).run(),
+    ).rejects.toThrow()
+
+    await created.db.prepare(
+      `INSERT INTO questionnaire_submissions (
+        submission_id, event_id, session_id, phase, instrument_version,
+        client_started_at, client_submitted_at, server_submitted_at, item_count
+      ) VALUES (?, ?, ?, 'pre', ?, ?, ?, ?, 5)`,
+    ).bind(
+      'submission-1',
+      crypto.randomUUID(),
+      'session-stage-3',
+      'state-assessment-pre-1.0.0',
+      now,
+      now,
+      now,
+    ).run()
+
+    await expect(
+      created.db.prepare(
+        `INSERT INTO questionnaire_submissions (
+          submission_id, event_id, session_id, phase, instrument_version,
+          client_started_at, client_submitted_at, server_submitted_at, item_count
+        ) VALUES (?, ?, ?, 'pre', ?, ?, ?, ?, 5)`,
+      ).bind(
+        'submission-2',
+        crypto.randomUUID(),
+        'session-stage-3',
+        'state-assessment-pre-1.0.0',
+        now,
+        now,
+        now,
+      ).run(),
+    ).rejects.toThrow()
+  })
+
+  it('cascades a session deletion through all Stage 3 intake rows', async () => {
+    const created = await createWorkerRuntime()
+    runtime = created.runtime
+    const foreignKeys = await created.db.prepare('PRAGMA foreign_keys = ON').run()
+    expect(foreignKeys.success).toBe(true)
+    const foreignKeyRows = await created.db.prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table' AND name IN (
+         'consent_records', 'demographic_revisions',
+         'questionnaire_submissions', 'questionnaire_answers'
+       )`,
+    ).all<{ name: string }>()
+    expect(foreignKeyRows.results).toHaveLength(4)
   })
 })

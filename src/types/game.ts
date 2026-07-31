@@ -4,6 +4,12 @@ export type PressureStage = 'green' | 'orange' | 'red'
 export type SunkCostChoice = 'continue' | 'stop_loss' | 'give_up' | null
 export type GamePhase = 'start' | 'playing' | 'decision' | 'report'
 export type GameMode = 'formal' | 'quick'
+export type FormalSessionStep =
+  | 'consent_pending'
+  | 'demographics'
+  | 'pre_task'
+  | 'game_ready'
+  | 'playing'
 export type PublicCandidateId = 'A' | 'B' | 'C' | 'D' | 'E'
 export type CandidateDisplayOrder = [
   PublicCandidateId,
@@ -46,6 +52,7 @@ export type FormalSessionContext = {
   versions: FormalSessionVersions
   candidateDisplayOrder: CandidateDisplayOrder
   initialOpenedCandidate: PublicCandidateId
+  currentStep: FormalSessionStep
   createdAt: string
 }
 
@@ -58,7 +65,64 @@ export type CreateFormalSessionRequest = {
 export type CreateFormalSessionResponse = FormalSessionContext & {
   created: boolean
   mode: 'formal'
+}
+
+export type FormalConsentResponse = {
+  created: boolean
+  sessionId: string
   currentStep: 'demographics'
+  consent: {
+    accepted: true
+    version: string
+    acceptedAt: string
+  }
+}
+
+export type FormalDemographicsResponse = {
+  created: boolean
+  sessionId: string
+  currentStep: 'pre_task'
+  revisionNo: number
+  demographics: DemographicData
+  submittedAt: string
+}
+
+export type FormalPreTaskResponse = {
+  created: boolean
+  sessionId: string
+  currentStep: 'game_ready'
+  submissionId: string
+  itemCount: 5
+}
+
+export type FormalResumeData = {
+  session: FormalSessionContext & { mode: 'formal' }
+  consent: {
+    accepted: true
+    version: string
+    acceptedAt: string
+  } | null
+  demographics: {
+    revisionNo: number
+    demographics: DemographicData
+    submittedAt: string
+  } | null
+  preTask: {
+    instrumentVersion: string
+    startedAt: string
+    submittedAt: string
+    answers: Array<{
+      itemId: StateAssessmentId
+      value: number
+      touched: true
+      answeredAt: string
+    }>
+  } | null
+  game: {
+    startedAt: string | null
+    deadlineAt: string | null
+    resumeSupported: false
+  }
 }
 
 export type Evidence = {
@@ -179,6 +243,7 @@ export type NikoMessage = {
 export type ConsentRecord = {
   accepted: boolean
   acceptedAt: string | null
+  version?: string
 }
 
 export type DemographicData = {

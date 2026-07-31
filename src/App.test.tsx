@@ -3,47 +3,53 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { ConsentScreen } from './components/ConsentScreen'
 import { DemographicForm } from './components/DemographicForm'
+import { GameScreen } from './components/GameScreen'
 import { IdentityForm } from './components/IdentityForm'
 import { StartScreen } from './components/StartScreen'
+import { StateAssessmentScreen } from './components/StateAssessmentScreen'
+import type { DemographicData, FormalSessionContext, StateAssessmentData } from './types/game'
 import {
   FORMAL_SESSION_STORAGE_KEY,
+  PENDING_CONSENT_KEY_STORAGE_KEY,
   PENDING_CREATION_KEY_STORAGE_KEY,
+  PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
+  PENDING_PRE_TASK_KEY_STORAGE_KEY,
 } from './utils/formalSessionStorage'
 
 class MemoryStorage {
   private readonly values = new Map<string, string>()
-
-  getItem(key: string) {
-    return this.values.get(key) ?? null
-  }
-
-  setItem(key: string, value: string) {
-    this.values.set(key, value)
-  }
-
-  removeItem(key: string) {
-    this.values.delete(key)
-  }
+  getItem(key: string) { return this.values.get(key) ?? null }
+  setItem(key: string, value: string) { this.values.set(key, value) }
+  removeItem(key: string) { this.values.delete(key) }
 }
 
-const successData = {
-  created: true,
+const demographics: DemographicData = {
+  ageRange: '21–23',
+  gender: '不愿透露',
+  education: '本科',
+  grade: '大三',
+  majorCategory: '计算机或人工智能',
+  relatedExperience: ['数据分析相关经历'],
+}
+const preTask: StateAssessmentData = {
+  stress: 0,
+  fatigue: 1,
+  attention: 2,
+  mood: 3,
+  physicalDiscomfort: 4,
+}
+const context: FormalSessionContext = {
   participantId: '11111111-1111-4111-8111-111111111111',
   sessionId: '22222222-2222-4222-8222-222222222222',
-  mode: 'formal',
   configSetId: 'config-2026-07-v1',
   versions: {
-    task: 'task-1.0.0',
-    material: 'material-1.0.0',
-    pointRule: 'points-5-v1',
-    scoring: 'RDI-2.0-prepilot',
-    benchmark: 'benchmark-1.0.0',
-    norm: null,
+    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1',
+    scoring: 'RDI-2.0-prepilot', benchmark: 'benchmark-1.0.0', norm: null,
   },
   candidateDisplayOrder: ['D', 'B', 'E', 'A', 'C'],
   initialOpenedCandidate: 'D',
-  currentStep: 'demographics',
-  createdAt: '2026-07-31T00:00:00.000Z',
+  currentStep: 'consent_pending',
+  createdAt: '2026-08-01T00:00:00.000Z',
 }
 
 let localStorage: MemoryStorage
@@ -69,92 +75,216 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  if (renderer) {
-    act(() => renderer?.unmount())
-  }
+  if (renderer) act(() => renderer?.unmount())
   renderer = undefined
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: originalWindow,
-  })
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow })
   if (originalFetch) globalThis.fetch = originalFetch
   vi.restoreAllMocks()
 })
 
-function startFormal() {
-  renderer = create(<App />)
-  act(() => renderer!.root.findByType(StartScreen).props.onStart('formal'))
-  expect(renderer.root.findAllByType(ConsentScreen)).toHaveLength(1)
-  act(() => renderer!.root.findByType(ConsentScreen).props.onAccept())
-  return renderer.root.findByType(IdentityForm)
+function envelope(data: unknown, status = 200) {
+  return new Response(JSON.stringify({ ok: true, data, requestId: 'request-test' }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
-describe('App formal session creation flow', () => {
-  it('routes formal consent to identity and successful creation to demographics', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ ok: true, data: successData, requestId: 'request-1' }),
-        { status: 201, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    const identity = startFormal()
+async function renderApp() {
+  await act(async () => { renderer = create(<App />) })
+  return renderer!
+}
 
-    await act(async () => {
-      await identity.props.onSubmit({ fullName: 'In Memory Only' })
+async function startFormal() {
+  await renderApp()
+  act(() => renderer!.root.findByType(StartScreen).props.onStart('formal'))
+  act(() => renderer!.root.findByType(ConsentScreen).props.onAccept())
+  return renderer!.root.findByType(IdentityForm)
+}
+
+function resumeData(step: FormalSessionContext['currentStep']) {
+  return {
+    session: { ...context, currentStep: step, mode: 'formal' },
+    consent: step === 'consent_pending' ? null : {
+      accepted: true, version: 'consent-1.0.0', acceptedAt: '2026-08-01T00:00:00.000Z',
+    },
+    demographics: ['pre_task', 'game_ready'].includes(step) ? {
+      revisionNo: 1, demographics, submittedAt: '2026-08-01T00:01:00.000Z',
+    } : null,
+    preTask: step === 'game_ready' ? {
+      instrumentVersion: 'state-assessment-pre-1.0.0',
+      startedAt: '2026-08-01T00:02:00.000Z',
+      submittedAt: '2026-08-01T00:03:00.000Z',
+      answers: Object.entries(preTask).map(([itemId, value]) => ({
+        itemId, value, touched: true, answeredAt: '2026-08-01T00:03:00.000Z',
+      })),
+    } : null,
+    game: { startedAt: null, deadlineAt: null, resumeSupported: false },
+  }
+}
+
+describe('App formal intake persistence', () => {
+  it('saves session, consent, demographics, and pre-task before entering the game', async () => {
+    const paths: string[] = []
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input)
+      paths.push(path)
+      if (path === '/api/sessions') return envelope({ ...context, created: true, mode: 'formal' }, 201)
+      if (path === '/api/consent') return envelope({
+        created: true, sessionId: context.sessionId, currentStep: 'demographics',
+        consent: { accepted: true, version: 'consent-1.0.0', acceptedAt: '2026-08-01T00:00:00.000Z' },
+      }, 201)
+      if (path === '/api/demographics') return envelope({
+        created: true, sessionId: context.sessionId, currentStep: 'pre_task',
+        revisionNo: 1, demographics, submittedAt: '2026-08-01T00:01:00.000Z',
+      }, 201)
+      return envelope({
+        created: true, sessionId: context.sessionId, currentStep: 'game_ready',
+        submissionId: '44444444-4444-4444-8444-444444444444', itemCount: 5,
+      }, 201)
     })
-
-    expect(renderer!.root.findAllByType(IdentityForm)).toHaveLength(0)
+    const identity = await startFormal()
+    await act(async () => identity.props.onSubmit({ fullName: 'Memory Only' }))
     expect(renderer!.root.findAllByType(DemographicForm)).toHaveLength(1)
+    await act(async () => renderer!.root.findByType(DemographicForm).props.onSubmit(demographics))
+    await act(async () => renderer!.root.findByType(StateAssessmentScreen).props.onSubmit(preTask, {
+      touched: { stress: true, fatigue: true, attention: true, mood: true, physicalDiscomfort: true },
+      startedAt: '2026-08-01T00:02:00.000Z',
+      submittedAt: '2026-08-01T00:03:00.000Z',
+    }))
+
+    expect(paths).toEqual(['/api/sessions', '/api/consent', '/api/demographics', '/api/questionnaires'])
+    expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(1)
     const stored = localStorage.getItem(FORMAL_SESSION_STORAGE_KEY) ?? ''
-    expect(JSON.parse(stored)).toMatchObject({
-      sessionId: successData.sessionId,
-      participantId: successData.participantId,
-      candidateDisplayOrder: successData.candidateDisplayOrder,
-    })
-    expect(stored).not.toContain('In Memory Only')
-    expect(sessionStorage.getItem(PENDING_CREATION_KEY_STORAGE_KEY)).toBeNull()
+    expect(JSON.parse(stored).currentStep).toBe('game_ready')
+    expect(stored).not.toMatch(/Memory Only|ageRange|stress|phone|studentId/i)
+    for (const key of [
+      PENDING_CREATION_KEY_STORAGE_KEY,
+      PENDING_CONSENT_KEY_STORAGE_KEY,
+      PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
+      PENDING_PRE_TASK_KEY_STORAGE_KEY,
+    ]) expect(sessionStorage.getItem(key)).toBeNull()
   })
 
-  it('stays on identity after failure and reuses the same pending key on retry', async () => {
-    const keys: string[] = []
-    globalThis.fetch = vi
-      .fn()
-      .mockImplementationOnce(async (_url: unknown, init: RequestInit) => {
-        keys.push(new Headers(init.headers).get('Idempotency-Key') ?? '')
-        throw new Error('offline')
+  it('does not recreate or re-upload identity when consent persistence needs a retry', async () => {
+    const calls: Array<{ path: string; body: string }> = []
+    let consentAttempts = 0
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input)
+      calls.push({ path, body: String(init?.body ?? '') })
+      if (path === '/api/sessions') return envelope({ ...context, created: true, mode: 'formal' }, 201)
+      consentAttempts += 1
+      if (consentAttempts === 1) throw new Error('offline')
+      return envelope({
+        created: false, sessionId: context.sessionId, currentStep: 'demographics',
+        consent: { accepted: true, version: 'consent-1.0.0', acceptedAt: '2026-08-01T00:00:00.000Z' },
       })
-      .mockImplementationOnce(async (_url: unknown, init: RequestInit) => {
-        keys.push(new Headers(init.headers).get('Idempotency-Key') ?? '')
-        return new Response(
-          JSON.stringify({ ok: true, data: successData, requestId: 'request-2' }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      })
-    const identity = startFormal()
-
-    await expect(identity.props.onSubmit({ studentId: 'RETRY-001' })).rejects.toThrow()
-    expect(renderer!.root.findAllByType(IdentityForm)).toHaveLength(1)
-    await act(async () => {
-      await renderer!.root
-        .findByType(IdentityForm)
-        .props.onSubmit({ studentId: 'RETRY-001' })
     })
+    const identity = await startFormal()
+    await act(async () => { await expect(identity.props.onSubmit({ studentId: 'PRIVATE-1' })).rejects.toThrow() })
+    expect(localStorage.getItem(FORMAL_SESSION_STORAGE_KEY)).not.toBeNull()
+    const retry = renderer!.root.findByProps({ 'data-testid': 'retry-formal-consent' })
+    await act(async () => retry.props.onClick())
 
-    expect(keys).toHaveLength(2)
-    expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/i)
-    expect(keys[1]).toBe(keys[0])
+    expect(calls.filter((call) => call.path === '/api/sessions')).toHaveLength(1)
+    expect(calls.filter((call) => call.body.includes('PRIVATE-1'))).toHaveLength(1)
     expect(renderer!.root.findAllByType(DemographicForm)).toHaveLength(1)
   })
 
-  it('keeps quick mode out of identity, API, and formal storage', () => {
+  it('keeps a failed demographic or pre-task submission on the same screen with its operation key', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path === '/api/sessions') return envelope({ ...context, created: true, mode: 'formal' }, 201)
+      if (path === '/api/consent') return envelope({
+        created: true, sessionId: context.sessionId, currentStep: 'demographics',
+        consent: { accepted: true, version: 'consent-1.0.0', acceptedAt: '2026-08-01T00:00:00.000Z' },
+      }, 201)
+      throw new Error('offline')
+    })
+    const identity = await startFormal()
+    await act(async () => identity.props.onSubmit({ fullName: 'Temporary' }))
+    await act(async () => {
+      await expect(renderer!.root.findByType(DemographicForm).props.onSubmit(demographics)).rejects.toThrow()
+    })
+    expect(renderer!.root.findAllByType(DemographicForm)).toHaveLength(1)
+    expect(sessionStorage.getItem(PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY)).toMatch(/^[0-9a-f-]{36}$/i)
+  })
+})
+
+describe('App formal refresh recovery', () => {
+  it.each([
+    ['consent_pending', ConsentScreen],
+    ['demographics', DemographicForm],
+    ['pre_task', StateAssessmentScreen],
+    ['game_ready', GameScreen],
+  ] as const)('restores server step %s to the correct screen', async (step, Component) => {
+    localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify({ ...context, currentStep: step }))
+    globalThis.fetch = vi.fn(async () => envelope(resumeData(step)))
+    await renderApp()
+    expect(renderer!.root.findAllByType(Component)).toHaveLength(1)
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `/api/sessions/${context.sessionId}/resume`,
+      { method: 'GET', credentials: 'include' },
+    )
+  })
+
+  it('does not call resume without a safe context and clears corrupt JSON', async () => {
     globalThis.fetch = vi.fn()
-    renderer = create(<App />)
+    await renderApp()
+    expect(renderer!.root.findAllByType(StartScreen)).toHaveLength(1)
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+    act(() => renderer!.unmount())
+    renderer = undefined
 
+    localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, '{broken')
+    await renderApp()
+    expect(renderer!.root.findAllByType(StartScreen)).toHaveLength(1)
+    expect(localStorage.getItem(FORMAL_SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it('clears unauthorized context but preserves it across a retryable network failure', async () => {
+    localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify(context))
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      ok: false,
+      error: { code: 'SESSION_UNAUTHORIZED', message: 'Expired.' },
+      requestId: 'request-auth',
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } }))
+    await renderApp()
+    expect(localStorage.getItem(FORMAL_SESSION_STORAGE_KEY)).toBeNull()
+    expect(renderer!.root.findAllByProps({ 'data-testid': 'formal-session-expired' })).toHaveLength(1)
+    act(() => renderer!.unmount())
+    renderer = undefined
+
+    localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify(context))
+    globalThis.fetch = vi.fn(async () => { throw new Error('offline') })
+    await renderApp()
+    expect(localStorage.getItem(FORMAL_SESSION_STORAGE_KEY)).not.toBeNull()
+    expect(renderer!.root.findAllByProps({ 'data-testid': 'formal-recovery-retry' })).toHaveLength(1)
+  })
+
+  it('shows an explicit unsupported message for a playing session', async () => {
+    localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify({ ...context, currentStep: 'playing' }))
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      ok: false,
+      error: { code: 'GAME_RESUME_NOT_READY', message: 'Not ready.' },
+      requestId: 'request-playing',
+    }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+    await renderApp()
+    expect(renderer!.root.findAllByProps({ 'data-testid': 'formal-game-resume-unsupported' })).toHaveLength(1)
+    expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(0)
+  })
+
+  it('keeps quick mode out of every formal API and formal persistence key', async () => {
+    globalThis.fetch = vi.fn()
+    await renderApp()
     act(() => renderer!.root.findByType(StartScreen).props.onStart('quick'))
-
-    expect(renderer.root.findAllByType(IdentityForm)).toHaveLength(0)
+    expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(1)
     expect(globalThis.fetch).not.toHaveBeenCalled()
     expect(localStorage.getItem(FORMAL_SESSION_STORAGE_KEY)).toBeNull()
-    expect(sessionStorage.getItem(PENDING_CREATION_KEY_STORAGE_KEY)).toBeNull()
+    for (const key of [
+      PENDING_CREATION_KEY_STORAGE_KEY,
+      PENDING_CONSENT_KEY_STORAGE_KEY,
+      PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
+      PENDING_PRE_TASK_KEY_STORAGE_KEY,
+    ]) expect(sessionStorage.getItem(key)).toBeNull()
   })
 })

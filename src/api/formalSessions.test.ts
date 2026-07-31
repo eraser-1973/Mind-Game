@@ -28,7 +28,7 @@ const responseData = {
   },
   candidateDisplayOrder: ['B', 'E', 'A', 'D', 'C'],
   initialOpenedCandidate: 'B',
-  currentStep: 'demographics',
+  currentStep: 'consent_pending',
   createdAt: '2026-07-31T00:00:00.000Z',
 }
 

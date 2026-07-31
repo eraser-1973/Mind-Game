@@ -41,6 +41,7 @@ vi.mock('../state/gameReducer', async () => {
                 'C',
               ],
               initialOpenedCandidate: 'D' as const,
+              currentStep: 'game_ready' as const,
               createdAt: '2026-07-31T00:00:00.000Z',
             },
             consent: { accepted: true, acceptedAt: '2026-07-31T00:00:00.000Z' },

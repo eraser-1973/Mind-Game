@@ -3,7 +3,21 @@ import { isFormalSessionContext } from './formalSessionContext'
 
 export const FORMAL_SESSION_STORAGE_KEY = 'mind-game.formal-session.v1'
 export const PENDING_CREATION_KEY_STORAGE_KEY =
-  'mind-game.formal-session.creation-key.v1'
+  'mind-game.pending.session-create.v1'
+export const PENDING_CONSENT_KEY_STORAGE_KEY =
+  'mind-game.pending.consent.v1'
+export const PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY =
+  'mind-game.pending.demographics.v1'
+export const PENDING_PRE_TASK_KEY_STORAGE_KEY =
+  'mind-game.pending.pre-task.v1'
+
+export type FormalPendingOperation = 'consent' | 'demographics' | 'preTask'
+
+const operationKeys: Record<FormalPendingOperation, string> = {
+  consent: PENDING_CONSENT_KEY_STORAGE_KEY,
+  demographics: PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
+  preTask: PENDING_PRE_TASK_KEY_STORAGE_KEY,
+}
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -31,6 +45,29 @@ export function clearPendingCreationKey(
   storage.removeItem(PENDING_CREATION_KEY_STORAGE_KEY)
 }
 
+export function getOrCreatePendingOperationKey(
+  operation: FormalPendingOperation,
+  storage: StorageLike = window.sessionStorage,
+  createUuid: () => string = () => crypto.randomUUID(),
+): string {
+  const key = operationKeys[operation]
+  const existing = storage.getItem(key)
+  if (existing && UUID_PATTERN.test(existing)) return existing
+  const created = createUuid()
+  if (!UUID_PATTERN.test(created)) {
+    throw new Error('Unable to create a valid operation key.')
+  }
+  storage.setItem(key, created)
+  return created
+}
+
+export function clearPendingOperationKey(
+  operation: FormalPendingOperation,
+  storage: StorageLike = window.sessionStorage,
+): void {
+  storage.removeItem(operationKeys[operation])
+}
+
 export function saveFormalSessionContext(
   context: FormalSessionContext,
   storage: StorageLike = window.localStorage,
@@ -49,8 +86,17 @@ export function loadFormalSessionContext(
 
   try {
     const parsed: unknown = JSON.parse(serialized)
-    return isFormalSessionContext(parsed) ? parsed : null
+    if (isFormalSessionContext(parsed)) return parsed
+    storage.removeItem(FORMAL_SESSION_STORAGE_KEY)
+    return null
   } catch {
+    storage.removeItem(FORMAL_SESSION_STORAGE_KEY)
     return null
   }
+}
+
+export function removeFormalSessionContext(
+  storage: StorageLike = window.localStorage,
+): void {
+  storage.removeItem(FORMAL_SESSION_STORAGE_KEY)
 }

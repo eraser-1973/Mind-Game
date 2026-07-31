@@ -63,7 +63,7 @@ export function buildSessionInsertStatements(
         created_at, started_at, deadline_at, ended_at
       ) VALUES (
         ?, ?, ?, 'formal', ?, ?, ?, ?, ?, ?, ?, json(?), ?,
-        'in_progress', 'demographics', 'none', ?, ?, ?, ?, 0,
+        'in_progress', 'consent_pending', 'none', ?, ?, ?, ?, 0,
         ?, NULL, NULL, NULL
       )`,
     ).bind(

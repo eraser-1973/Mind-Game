@@ -125,7 +125,7 @@ describe('POST /api/sessions validation and creation', () => {
           benchmark: 'benchmark-1.0.0',
           norm: null,
         },
-        currentStep: 'demographics',
+        currentStep: 'consent_pending',
       },
       requestId: expect.any(String),
     })
@@ -192,7 +192,7 @@ describe('POST /api/sessions validation and creation', () => {
       norm_version: null,
       initial_opened_candidate: payload.data.candidateDisplayOrder[0],
       completion_status: 'in_progress',
-      current_step: 'demographics',
+      current_step: 'consent_pending',
       final_submit_mode: 'none',
       started_at: null,
       deadline_at: null,

@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest'
 import type { FormalSessionContext } from '../types/game'
 import {
   clearPendingCreationKey,
+  clearPendingOperationKey,
   FORMAL_SESSION_STORAGE_KEY,
   getOrCreatePendingCreationKey,
+  getOrCreatePendingOperationKey,
   loadFormalSessionContext,
+  PENDING_CONSENT_KEY_STORAGE_KEY,
   PENDING_CREATION_KEY_STORAGE_KEY,
+  PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
+  PENDING_PRE_TASK_KEY_STORAGE_KEY,
+  removeFormalSessionContext,
   saveFormalSessionContext,
   type StorageLike,
 } from './formalSessionStorage'
@@ -40,6 +46,7 @@ const context: FormalSessionContext = {
   },
   candidateDisplayOrder: ['B', 'E', 'A', 'D', 'C'],
   initialOpenedCandidate: 'B',
+  currentStep: 'consent_pending',
   createdAt: '2026-07-31T00:00:00.000Z',
 }
 
@@ -101,5 +108,45 @@ describe('formal session storage', () => {
         () => '55555555-5555-4555-8555-555555555555',
       ),
     ).toBe('55555555-5555-4555-8555-555555555555')
+  })
+
+  it('uses independent payload-free operation keys and clears only the completed operation', () => {
+    const storage = new MemoryStorage()
+    const generated = [
+      '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777',
+      '88888888-8888-4888-8888-888888888888',
+    ]
+    const createUuid = () => generated.shift()!
+
+    expect(getOrCreatePendingOperationKey('consent', storage, createUuid)).toBe(
+      '66666666-6666-4666-8666-666666666666',
+    )
+    expect(getOrCreatePendingOperationKey('demographics', storage, createUuid)).toBe(
+      '77777777-7777-4777-8777-777777777777',
+    )
+    expect(getOrCreatePendingOperationKey('preTask', storage, createUuid)).toBe(
+      '88888888-8888-4888-8888-888888888888',
+    )
+    clearPendingOperationKey('consent', storage)
+    expect(storage.getItem(PENDING_CONSENT_KEY_STORAGE_KEY)).toBeNull()
+    expect(storage.getItem(PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY)).not.toBeNull()
+    expect(storage.getItem(PENDING_PRE_TASK_KEY_STORAGE_KEY)).not.toBeNull()
+    expect(JSON.stringify(storage)).not.toContain('ageRange')
+  })
+
+  it('removes corrupt safe context and supports explicit session removal', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(FORMAL_SESSION_STORAGE_KEY, '{broken')
+    expect(loadFormalSessionContext(storage)).toBeNull()
+    expect(storage.getItem(FORMAL_SESSION_STORAGE_KEY)).toBeNull()
+
+    saveFormalSessionContext(context, storage)
+    removeFormalSessionContext(storage)
+    expect(storage.getItem(FORMAL_SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it('uses the required session-create key namespace', () => {
+    expect(PENDING_CREATION_KEY_STORAGE_KEY).toBe('mind-game.pending.session-create.v1')
   })
 })

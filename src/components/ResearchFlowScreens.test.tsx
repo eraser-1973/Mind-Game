@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { act, create } from 'react-test-renderer'
+import { describe, expect, it, vi } from 'vitest'
 import { defaultDemographics } from '../data/researchFlow'
 import { ConsentScreen } from './ConsentScreen'
 import { DemographicForm } from './DemographicForm'
 import { StateAssessmentScreen } from './StateAssessmentScreen'
+import { ScaleQuestion } from './ScaleQuestion'
 import { TaskExperienceScreen } from './TaskExperienceScreen'
 
 describe('research flow screens', () => {
@@ -62,6 +64,93 @@ describe('research flow screens', () => {
     expect(before).toContain('10=非常强烈')
     expect(after).toContain('任务后状态评估')
     expect(after).toContain('此刻，我感到身心疲劳。')
+  })
+
+  it('does not treat the visible slider position as an answer until all five items are touched', () => {
+    const onSubmit = vi.fn()
+    const renderer = create(
+      <StateAssessmentScreen
+        title="当前状态评估"
+        phase="before"
+        onSubmit={onSubmit}
+      />,
+    )
+    const questions = renderer.root.findAllByType(ScaleQuestion)
+    expect(questions).toHaveLength(5)
+    expect(questions.every((question) => question.props.value === null)).toBe(true)
+    expect(renderer.toJSON()).toMatchObject(expect.anything())
+
+    const submit = renderer.root.findAllByType('button').at(-1)!
+    act(() => submit.props.onClick())
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(renderer.root.findAllByProps({ role: 'alert' })).not.toHaveLength(0)
+
+    act(() => questions[0].props.onChange(0))
+    for (let index = 1; index < questions.length; index += 1) {
+      act(() => renderer.root.findAllByType(ScaleQuestion)[index].props.onChange(index))
+    }
+    act(() => renderer.root.findAllByType('button').at(-1)!.props.onClick())
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ stress: 0, physicalDiscomfort: 4 }),
+      expect.objectContaining({
+        touched: expect.objectContaining({ stress: true, physicalDiscomfort: true }),
+      }),
+    )
+    renderer.unmount()
+  })
+
+  it('treats authenticated resume values as completed without manufacturing default answers', () => {
+    const onSubmit = vi.fn()
+    const resumed = {
+      stress: 1,
+      fatigue: 2,
+      attention: 3,
+      mood: 4,
+      physicalDiscomfort: 5,
+    }
+    const renderer = create(
+      <StateAssessmentScreen
+        title="当前状态评估"
+        phase="before"
+        initialValue={resumed}
+        onSubmit={onSubmit}
+      />,
+    )
+    act(() => renderer.root.findAllByType('button').at(-1)!.props.onClick())
+    expect(onSubmit).toHaveBeenCalledWith(
+      resumed,
+      expect.objectContaining({ touched: {
+        stress: true,
+        fatigue: true,
+        attention: true,
+        mood: true,
+        physicalDiscomfort: true,
+      } }),
+    )
+    renderer.unmount()
+  })
+
+  it('records an explicit interaction at the visible zero position as a real zero answer', () => {
+    const onSubmit = vi.fn()
+    const renderer = create(
+      <StateAssessmentScreen
+        title="当前状态评估"
+        phase="before"
+        onSubmit={onSubmit}
+      />,
+    )
+    const firstRange = renderer.root.findAllByType('input')[0]
+    expect(firstRange.props.value).toBe(0)
+    act(() => firstRange.props.onPointerDown())
+    for (let index = 1; index < 5; index += 1) {
+      act(() => renderer.root.findAllByType(ScaleQuestion)[index].props.onChange(index))
+    }
+    act(() => renderer.root.findAllByType('button').at(-1)!.props.onClick())
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ stress: 0 }),
+      expect.any(Object),
+    )
+    renderer.unmount()
   })
 
   it('renders all manipulation-check groups and decision confidence', () => {

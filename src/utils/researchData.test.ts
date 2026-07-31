@@ -95,6 +95,7 @@ describe('researchData utilities', () => {
           'D',
         ],
         initialOpenedCandidate: 'C' as const,
+        currentStep: 'game_ready' as const,
         createdAt: '2026-07-31T00:00:00.000Z',
       },
       consent: {

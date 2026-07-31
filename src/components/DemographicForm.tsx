@@ -8,7 +8,7 @@ import type { DemographicData } from '../types/game'
 type Props = {
   initialValue?: DemographicData | null
   onBack: () => void
-  onSubmit: (value: DemographicData) => void
+  onSubmit: (value: DemographicData) => void | Promise<void>
 }
 
 const fieldLabels = {
@@ -29,6 +29,20 @@ export function DemographicForm({
   const [form, setForm] = useState<DemographicData>(
     initialValue ?? defaultDemographics,
   )
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const submit = async () => {
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await onSubmit(form)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : '提交失败，请重试。')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const setSingleChoice = (
     key: SingleChoiceKey,
@@ -115,15 +129,18 @@ export function DemographicForm({
           </div>
         </fieldset>
 
+        {submitError && <p className="research-error" role="alert">{submitError}</p>}
+
         <div className="research-actions">
           <button className="button button--ghost" onClick={onBack}>
             返回
           </button>
           <button
             className="button button--primary"
-            onClick={() => onSubmit(form)}
+            disabled={submitting}
+            onClick={() => void submit()}
           >
-            继续
+            {submitting ? '正在保存…' : '继续'}
           </button>
         </div>
       </section>

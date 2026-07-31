@@ -16,6 +16,7 @@ const formalSession: FormalSessionContext = {
   },
   candidateDisplayOrder: ['D', 'B', 'E', 'A', 'C'],
   initialOpenedCandidate: 'D',
+  currentStep: 'game_ready',
   createdAt: '2026-07-31T00:00:00.000Z',
 }
 

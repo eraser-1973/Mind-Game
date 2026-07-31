@@ -4,6 +4,13 @@ import type {
 } from '../types/game'
 
 const CANDIDATE_IDS = ['A', 'B', 'C', 'D', 'E'] as const
+const SESSION_STEPS = [
+  'consent_pending',
+  'demographics',
+  'pre_task',
+  'game_ready',
+  'playing',
+] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -34,6 +41,7 @@ export function isFormalSessionContext(
     value.configSetId.length > 0 &&
     isCandidateDisplayOrder(value.candidateDisplayOrder) &&
     value.initialOpenedCandidate === value.candidateDisplayOrder[0] &&
+    SESSION_STEPS.some((step) => step === value.currentStep) &&
     typeof value.createdAt === 'string' &&
     !Number.isNaN(Date.parse(value.createdAt)) &&
     typeof versions.task === 'string' &&
