@@ -11,6 +11,7 @@ import type {
   GameState,
   ResearchData,
 } from '../types/game'
+import type { FormalGameSnapshot } from '../types/formalGame'
 import { createNikoFeedback } from '../utils/nikoFeedback'
 import { generateReport } from '../utils/report'
 import { CandidateDetail } from './CandidateDetail'
@@ -21,15 +22,47 @@ import { NikoChatPanel } from './NikoChatPanel'
 import { ReportScreen } from './ReportScreen'
 import { SunkCostModal } from './SunkCostModal'
 import { TimerBar } from './TimerBar'
+import { FormalT1GameScreen } from './FormalT1GameScreen'
 
 type Props = {
   mode: GameMode
   onRestart: () => void
   researchData?: ResearchData | null
   onGameComplete?: (state: GameState) => void
+  formalGameSnapshot?: FormalGameSnapshot | null
+  onFormalGameSnapshot?: (snapshot: FormalGameSnapshot) => void
 }
 
 export function GameScreen({
+  mode,
+  onRestart,
+  researchData = null,
+  onGameComplete,
+  formalGameSnapshot = null,
+  onFormalGameSnapshot,
+}: Props) {
+  if (mode === 'formal' && researchData?.formalSession) {
+    return (
+      <FormalT1GameScreen
+        session={researchData.formalSession}
+        initialSnapshot={formalGameSnapshot}
+        onSnapshot={onFormalGameSnapshot}
+        onExit={onRestart}
+      />
+    )
+  }
+
+  return (
+    <QuickGameScreen
+      mode={mode}
+      onRestart={onRestart}
+      researchData={researchData}
+      onGameComplete={onGameComplete}
+    />
+  )
+}
+
+function QuickGameScreen({
   mode,
   onRestart,
   researchData = null,

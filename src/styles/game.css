@@ -1582,6 +1582,59 @@ p {
   background: rgba(34, 137, 177, 0.1);
 }
 
+.decision-card.is-selected {
+  border: 2px solid var(--cyan);
+  background: rgba(34, 137, 177, 0.13);
+  box-shadow: 0 0 0 1px rgba(44, 213, 255, 0.2), 0 0 24px rgba(34, 137, 177, 0.16);
+}
+
+.decision-card.is-selected > i {
+  margin-top: auto;
+  color: var(--cyan);
+  font-size: 0.64rem;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.formal-stage-screen {
+  display: grid;
+  place-items: start center;
+}
+
+.formal-stage-choice {
+  width: min(1120px, 100%);
+  padding: 1.5rem;
+}
+
+.formal-stage-choice > p,
+.formal-verification-lock p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.formal-stage-choice__grid {
+  margin: 1.25rem 0;
+}
+
+.formal-stage-choice__confidence {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.formal-verification-lock {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(34, 137, 177, 0.035);
+}
+
+.formal-game-error {
+  color: #f3c885 !important;
+}
+
 .decision-card > strong { margin-top: 1rem; font-size: 1rem; }
 .decision-card > small { min-height: 42px; margin-top: 0.3rem; color: var(--muted); font-size: 0.64rem; line-height: 1.5; }
 .decision-card > div { display: grid; gap: 0.35rem; margin-top: auto; color: #7891a9; font-size: 0.6rem; }

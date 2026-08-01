@@ -225,7 +225,9 @@ describe('0002 participant and formal session migration', () => {
 
 describe('0003 research intake and resume migration', () => {
   it('creates the Stage 3 intake tables and advances the schema version', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({
+      throughMigration: '0003_research_intake_resume.sql',
+    })
     runtime = created.runtime
     const tables = await created.db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",

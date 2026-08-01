@@ -156,11 +156,22 @@ function parseResume(value: unknown): FormalResumeData | null {
   if (value.consent !== null && !isRecord(value.consent)) return null
   if (value.demographics !== null && !isRecord(value.demographics)) return null
   if (value.preTask !== null && !isRecord(value.preTask)) return null
-  if (
-    (value.game.startedAt !== null && !isIso(value.game.startedAt)) ||
-    (value.game.deadlineAt !== null && !isIso(value.game.deadlineAt)) ||
-    value.game.resumeSupported !== false
-  ) return null
+  const preGame = value.game.resumeSupported === false &&
+    value.game.startedAt === null && value.game.deadlineAt === null
+  const playing = value.game.resumeSupported === true &&
+    value.game.started === true &&
+    isIso(value.game.startedAt) &&
+    isIso(value.game.deadlineAt) &&
+    isIso(value.game.serverNow) &&
+    value.game.durationSec === 900 &&
+    Number.isInteger(value.game.remainingSec) &&
+    typeof value.game.expired === 'boolean' &&
+    (value.game.currentStage === 'T1' || value.game.currentStage === 'T1_COMPLETE') &&
+    isRecord(value.game.points) &&
+    value.game.points.total === 5 && value.game.points.remaining === 5 &&
+    Array.isArray(value.game.ratings) &&
+    (value.game.stageChoice === null || isRecord(value.game.stageChoice))
+  if (!preGame && !playing) return null
   return value as FormalResumeData
 }
 

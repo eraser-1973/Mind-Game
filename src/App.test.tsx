@@ -38,6 +38,21 @@ const preTask: StateAssessmentData = {
   mood: 3,
   physicalDiscomfort: 4,
 }
+const gameSnapshot = {
+  started: true as const,
+  resumeSupported: true as const,
+  durationSec: 900 as const,
+  startedAt: '2026-08-01T00:04:00.000Z',
+  deadlineAt: '2026-08-01T00:19:00.000Z',
+  serverNow: '2026-08-01T00:04:00.000Z',
+  remainingSec: 900,
+  expired: false,
+  currentStage: 'T1' as const,
+  points: { total: 5 as const, remaining: 5 as const },
+  ratings: [],
+  stageChoice: null,
+  lastSequenceNo: 1,
+}
 const context: FormalSessionContext = {
   participantId: '11111111-1111-4111-8111-111111111111',
   sessionId: '22222222-2222-4222-8222-222222222222',
@@ -137,6 +152,16 @@ describe('App formal intake persistence', () => {
         created: true, sessionId: context.sessionId, currentStep: 'pre_task',
         revisionNo: 1, demographics, submittedAt: '2026-08-01T00:01:00.000Z',
       }, 201)
+      if (path.endsWith('/start')) return envelope({
+        ...gameSnapshot,
+        started: undefined,
+        resumeSupported: undefined,
+        created: true,
+        sessionId: context.sessionId,
+        currentStep: 'playing',
+        candidateDisplayOrder: context.candidateDisplayOrder,
+        initialOpenedCandidate: context.initialOpenedCandidate,
+      }, 201)
       return envelope({
         created: true, sessionId: context.sessionId, currentStep: 'game_ready',
         submissionId: '44444444-4444-4444-8444-444444444444', itemCount: 5,
@@ -152,10 +177,13 @@ describe('App formal intake persistence', () => {
       submittedAt: '2026-08-01T00:03:00.000Z',
     }))
 
-    expect(paths).toEqual(['/api/sessions', '/api/consent', '/api/demographics', '/api/questionnaires'])
+    expect(paths).toEqual([
+      '/api/sessions', '/api/consent', '/api/demographics', '/api/questionnaires',
+      `/api/sessions/${context.sessionId}/start`,
+    ])
     expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(1)
     const stored = localStorage.getItem(FORMAL_SESSION_STORAGE_KEY) ?? ''
-    expect(JSON.parse(stored).currentStep).toBe('game_ready')
+    expect(JSON.parse(stored).currentStep).toBe('playing')
     expect(stored).not.toMatch(/Memory Only|ageRange|stress|phone|studentId/i)
     for (const key of [
       PENDING_CREATION_KEY_STORAGE_KEY,
@@ -261,16 +289,23 @@ describe('App formal refresh recovery', () => {
     expect(renderer!.root.findAllByProps({ 'data-testid': 'formal-recovery-retry' })).toHaveLength(1)
   })
 
-  it('shows an explicit unsupported message for a playing session', async () => {
+  it('restores a playing session from the authoritative server snapshot without restarting it', async () => {
     localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify({ ...context, currentStep: 'playing' }))
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      ok: false,
-      error: { code: 'GAME_RESUME_NOT_READY', message: 'Not ready.' },
-      requestId: 'request-playing',
-    }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+    globalThis.fetch = vi.fn(async () => envelope({
+      session: { ...context, currentStep: 'playing', mode: 'formal' },
+      consent: null,
+      demographics: null,
+      preTask: null,
+      game: gameSnapshot,
+    }))
     await renderApp()
-    expect(renderer!.root.findAllByProps({ 'data-testid': 'formal-game-resume-unsupported' })).toHaveLength(1)
-    expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(0)
+    const game = renderer!.root.findByType(GameScreen)
+    expect(game.props.formalGameSnapshot).toEqual(gameSnapshot)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `/api/sessions/${context.sessionId}/resume`,
+      { method: 'GET', credentials: 'include' },
+    )
   })
 
   it('keeps quick mode out of every formal API and formal persistence key', async () => {

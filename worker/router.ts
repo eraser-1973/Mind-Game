@@ -1,6 +1,11 @@
 import type { Env } from './env'
 import { errorResponse } from './http/responses'
 import { handleHealth } from './routes/health'
+import {
+  handleStartFormalGame,
+  handleT1Rating,
+  handleT1StageChoice,
+} from './routes/formalGame'
 import { handleSessions } from './routes/sessions'
 import {
   handleConsent,
@@ -36,6 +41,19 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
 
   if (url.pathname === '/api/questionnaires') {
     return handleQuestionnaires(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/ratings') {
+    return handleT1Rating(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/stage-choices') {
+    return handleT1StageChoice(request, env, requestId)
+  }
+
+  const startMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/start$/)
+  if (startMatch) {
+    return handleStartFormalGame(request, env, requestId, startMatch[1])
   }
 
   const resumeMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/resume$/)

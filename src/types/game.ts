@@ -1,3 +1,5 @@
+import type { FormalGameSnapshot, PreGameResumeState } from './formalGame'
+
 export type RatingStage = 'T1' | 'T2' | 'T3'
 export type VerifyType = 'shallow' | 'deep'
 export type PressureStage = 'green' | 'orange' | 'red'
@@ -118,11 +120,7 @@ export type FormalResumeData = {
       answeredAt: string
     }>
   } | null
-  game: {
-    startedAt: string | null
-    deadlineAt: string | null
-    resumeSupported: false
-  }
+  game: PreGameResumeState | FormalGameSnapshot
 }
 
 export type Evidence = {

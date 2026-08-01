@@ -203,7 +203,7 @@ describe('Stage 3 authenticated intake happy path and resume', () => {
     ]) expect(text).not.toContain(forbidden)
   })
 
-  it('returns an explicit unsupported response for a playing session without mutating it', async () => {
+  it('rejects an inconsistent playing session without a game run and does not mutate it', async () => {
     await setup()
     const session = await createSession()
     await db!.prepare(
@@ -216,7 +216,7 @@ describe('Stage 3 authenticated intake happy path and resume', () => {
     )
     const text = await response.text()
     expect(response.status).toBe(409)
-    expect(text).toContain('GAME_RESUME_NOT_READY')
+    expect(text).toContain('SESSION_DATA_INTEGRITY_ERROR')
     expect(text).not.toContain('Secret')
     const row = await db!.prepare(
       'SELECT current_step, started_at FROM sessions WHERE session_id = ?',

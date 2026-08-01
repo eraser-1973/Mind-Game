@@ -29,6 +29,7 @@ import type {
   StateAssessmentId,
   TaskExperienceData,
 } from './types/game'
+import type { FormalGameSnapshot } from './types/formalGame'
 import { isFormalSessionContext } from './utils/formalSessionContext'
 import {
   clearPendingCreationKey,
@@ -41,6 +42,7 @@ import {
 } from './utils/formalSessionStorage'
 import { generateReport } from './utils/report'
 import { createResearchData } from './utils/researchData'
+import { clearAllFormalGamePendingKeys } from './utils/formalPendingKeys'
 
 const CLIENT_VERSION = import.meta.env.VITE_COMMIT_SHA ?? 'web-1.0.0'
 const CONSENT_VERSION = 'consent-1.0.0' as const
@@ -151,12 +153,14 @@ export default function App() {
   const [completedGameState, setCompletedGameState] = useState<GameState | null>(null)
   const [recoveryState, setRecoveryState] = useState<RecoveryState>('checking')
   const [formalActionError, setFormalActionError] = useState<FormalActionError>(null)
+  const [formalGameSnapshot, setFormalGameSnapshot] = useState<FormalGameSnapshot | null>(null)
 
   const clearPendingKeys = () => {
     clearPendingCreationKey()
     clearPendingOperationKey('consent')
     clearPendingOperationKey('demographics')
     clearPendingOperationKey('preTask')
+    clearAllFormalGamePendingKeys()
   }
 
   const resetSession = () => {
@@ -167,6 +171,7 @@ export default function App() {
     setResearchData(null)
     setCompletedGameState(null)
     setFormalActionError(null)
+    setFormalGameSnapshot(null)
     setRecoveryState('no_session')
     setSessionKey((value) => value + 1)
   }
@@ -197,6 +202,7 @@ export default function App() {
     setResearchStep(stepToResearchStep(resume.session.currentStep))
     setRecoveryState('resumed')
     setFormalActionError(null)
+    setFormalGameSnapshot(resume.game.resumeSupported ? resume.game : null)
   }
 
   const recoverFormalSession = async () => {
@@ -238,6 +244,7 @@ export default function App() {
     setCompletedGameState(null)
     setMode(nextMode)
     setFormalActionError(null)
+    setFormalGameSnapshot(null)
     if (nextMode === 'quick') {
       setResearchData(null)
       setResearchStep(null)
@@ -529,6 +536,16 @@ export default function App() {
       key={sessionKey}
       mode={mode}
       researchData={mode === 'formal' ? researchData : null}
+      formalGameSnapshot={mode === 'formal' ? formalGameSnapshot : null}
+      onFormalGameSnapshot={mode === 'formal'
+        ? (snapshot) => {
+            setFormalGameSnapshot(snapshot)
+            const context = researchData?.formalSession
+            if (context && context.currentStep !== 'playing') {
+              persistContext(contextAtStep(context, 'playing'))
+            }
+          }
+        : undefined}
       onGameComplete={mode === 'formal'
         ? (state) => {
             setCompletedGameState(state)

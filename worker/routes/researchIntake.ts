@@ -8,6 +8,7 @@ import {
   saveDemographics,
   savePreTaskQuestionnaire,
 } from '../services/researchIntake'
+import { FormalGameError, loadFormalGameResume } from '../services/formalGame'
 import {
   parseConsentRequest,
   parseDemographicsRequest,
@@ -18,9 +19,11 @@ import {
 
 function knownError(error: unknown): error is
   | SessionAuthError
+  | FormalGameError
   | ResearchIntakeError
   | ResearchIntakeRequestError {
   return error instanceof SessionAuthError ||
+    error instanceof FormalGameError ||
     error instanceof ResearchIntakeError ||
     error instanceof ResearchIntakeRequestError
 }
@@ -110,7 +113,9 @@ export async function handleSessionResume(
   try {
     const sessionId = requireUuid(rawSessionId)
     const session = await authenticateFormalSession(request, env.DB, sessionId)
-    const data = await loadResumeProjection(env.DB, session)
+    const data = session.currentStep === 'playing'
+      ? await loadFormalGameResume(env.DB, session)
+      : await loadResumeProjection(env.DB, session)
     return successResponse(data, requestId)
   } catch (error) {
     return errorResult(error, requestId)

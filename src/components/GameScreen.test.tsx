@@ -115,6 +115,10 @@ vi.mock('./TimerBar', () => ({
   TimerBar: () => <div>TimerBar</div>,
 }))
 
+vi.mock('./FormalT1GameScreen', () => ({
+  FormalT1GameScreen: () => <div>FormalT1GameScreen</div>,
+}))
+
 import { GameScreen } from './GameScreen'
 
 describe('GameScreen current task copy', () => {
@@ -144,10 +148,14 @@ describe('GameScreen current task copy', () => {
     )
   })
 
-  it('shows Niko only in the formal second stage and preserves the HR panel', () => {
+  it('routes an authenticated formal session to the server-backed T1 screen and keeps quick local', () => {
     mockState.setState?.(true, 'formal')
     const formal = renderToStaticMarkup(
-      <GameScreen mode="formal" onRestart={() => undefined} />,
+      <GameScreen
+        mode="formal"
+        researchData={mockState.state?.researchData}
+        onRestart={() => undefined}
+      />,
     )
 
     mockState.setState?.(true, 'quick')
@@ -155,8 +163,8 @@ describe('GameScreen current task copy', () => {
       <GameScreen mode="quick" onRestart={() => undefined} />,
     )
 
-    expect(formal).toContain('HRChatPanel')
-    expect(formal).toContain('NikoChatPanel')
+    expect(formal).toContain('FormalT1GameScreen')
+    expect(formal).not.toContain('NikoChatPanel')
     expect(quick).toContain('HRChatPanel')
     expect(quick).not.toContain('NikoChatPanel')
   })

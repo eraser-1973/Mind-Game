@@ -11,6 +11,29 @@ const migrationsDirectory = fileURLToPath(
 
 let bundledWorker: Promise<string> | undefined
 
+function splitMigrationStatements(source: string): string[] {
+  const statements: string[] = []
+  let current: string[] = []
+  let inTrigger = false
+
+  for (const line of source.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed && current.length === 0) continue
+    current.push(line)
+    if (/^CREATE\s+TRIGGER\b/i.test(trimmed)) inTrigger = true
+    const complete = inTrigger
+      ? /^END;$/i.test(trimmed)
+      : trimmed.endsWith(';')
+    if (!complete) continue
+    statements.push(current.join('\n').trim())
+    current = []
+    inTrigger = false
+  }
+
+  if (current.join('').trim()) statements.push(current.join('\n').trim())
+  return statements
+}
+
 async function getBundledWorker(): Promise<string> {
   bundledWorker ??= build({
     entryPoints: [workerEntry],
@@ -43,12 +66,7 @@ export async function createWorkerRuntime(options?: {
 
     for (const name of migrationNames) {
       const migration = await readFile(join(migrationsDirectory, name), 'utf8')
-      const statements = migration
-        .split(';')
-        .map((statement) => statement.trim())
-        .filter(Boolean)
-
-      for (const statement of statements) {
+      for (const statement of splitMigrationStatements(migration)) {
         await db.prepare(statement).run()
       }
 
