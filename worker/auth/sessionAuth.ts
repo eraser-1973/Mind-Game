@@ -26,6 +26,7 @@ export type AuthenticatedSession = {
   taskVersion: string
   materialVersion: string
   pointRuleVersion: string
+  sunkCostRuleVersion: string
   scoringVersion: string
   benchmarkVersion: string
   normVersion: string | null
@@ -46,6 +47,7 @@ type AuthRow = {
   task_version: string
   material_version: string
   point_rule_version: string
+  sunk_cost_rule_version: string
   scoring_version: string
   benchmark_version: string
   norm_version: string | null
@@ -88,6 +90,7 @@ export async function authenticateFormalSession(
   request: Request,
   db: D1Database,
   expectedSessionId?: string,
+  options: { allowedCompletionStatuses?: readonly string[] } = {},
 ): Promise<AuthenticatedSession> {
   const token = parseCookie(request.headers.get('Cookie'))
   if (!token || !TOKEN_PATTERN.test(token)) throw unauthorized()
@@ -96,7 +99,7 @@ export async function authenticateFormalSession(
   const row = await db.prepare(
     `SELECT s.session_id, s.participant_id, s.mode, s.completion_status,
             s.current_step, s.config_set_id, s.task_version,
-            s.material_version, s.point_rule_version, s.scoring_version,
+            s.material_version, s.point_rule_version, s.sunk_cost_rule_version, s.scoring_version,
             s.benchmark_version, s.norm_version, s.candidate_display_order,
             s.initial_opened_candidate, s.created_at, s.started_at,
             s.deadline_at, c.token_hash, c.revoked_at
@@ -122,7 +125,8 @@ export async function authenticateFormalSession(
     )
   }
 
-  if (row.completion_status !== 'in_progress') {
+  const allowedStatuses = options.allowedCompletionStatuses ?? ['in_progress']
+  if (!allowedStatuses.includes(row.completion_status)) {
     throw new SessionAuthError(
       409,
       'SESSION_NOT_ACTIVE',
@@ -140,6 +144,7 @@ export async function authenticateFormalSession(
     taskVersion: row.task_version,
     materialVersion: row.material_version,
     pointRuleVersion: row.point_rule_version,
+    sunkCostRuleVersion: row.sunk_cost_rule_version,
     scoringVersion: row.scoring_version,
     benchmarkVersion: row.benchmark_version,
     normVersion: row.norm_version,

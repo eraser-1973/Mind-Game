@@ -112,8 +112,10 @@ export async function handleSessionResume(
   if (request.method !== 'GET') return methodNotAllowed(requestId, 'GET')
   try {
     const sessionId = requireUuid(rawSessionId)
-    const session = await authenticateFormalSession(request, env.DB, sessionId)
-    const data = session.currentStep === 'playing'
+    const session = await authenticateFormalSession(request, env.DB, sessionId, {
+      allowedCompletionStatuses: ['in_progress', 'timeout', 'completed'],
+    })
+    const data = session.currentStep === 'playing' || session.currentStep === 'post_task'
       ? await loadFormalGameResume(env.DB, session)
       : await loadResumeProjection(env.DB, session)
     return successResponse(data, requestId)

@@ -102,6 +102,7 @@ function stepToResearchStep(step: FormalSessionStep): ResearchStep | null {
   if (step === 'demographics') return 'demographics'
   if (step === 'pre_task') return 'preTask'
   if (step === 'game_ready') return null
+  if (step === 'post_task') return null
   return null
 }
 
@@ -202,7 +203,11 @@ export default function App() {
     setResearchStep(stepToResearchStep(resume.session.currentStep))
     setRecoveryState('resumed')
     setFormalActionError(null)
-    setFormalGameSnapshot(resume.game.resumeSupported ? resume.game : null)
+    setFormalGameSnapshot(resume.game.resumeSupported ? {
+      ...resume.game,
+      sunkCost: resume.sunkCost ?? null,
+      finalDecision: resume.finalDecision ?? null,
+    } : null)
   }
 
   const recoverFormalSession = async () => {
@@ -541,8 +546,11 @@ export default function App() {
         ? (snapshot) => {
             setFormalGameSnapshot(snapshot)
             const context = researchData?.formalSession
-            if (context && context.currentStep !== 'playing') {
+            if (context && context.currentStep !== 'playing' && !snapshot.finalDecision) {
               persistContext(contextAtStep(context, 'playing'))
+            }
+            if (context && snapshot.finalDecision && context.currentStep !== 'post_task') {
+              persistContext(contextAtStep(context, 'post_task'))
             }
           }
         : undefined}

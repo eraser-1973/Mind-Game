@@ -104,7 +104,7 @@ describe('formal research API client', () => {
         mode: 'formal',
         configSetId: 'config-2026-07-v1',
         versions: {
-          task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1',
+          task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1', sunkCostRule: 'sunk-1.0.0',
           scoring: 'RDI-2.0-prepilot', benchmark: 'benchmark-1.0.0', norm: null,
         },
         candidateDisplayOrder: ['B', 'E', 'A', 'D', 'C'],

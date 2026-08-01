@@ -3,6 +3,7 @@ export type ConfigurationSet = {
   taskVersion: string
   materialVersion: string
   pointRuleVersion: string
+  sunkCostRuleVersion: string
   scoringVersion: string
   benchmarkVersion: string
   normVersion: string | null
@@ -13,6 +14,7 @@ type ConfigurationSetRow = {
   task_version: string
   material_version: string
   point_rule_version: string
+  sunk_cost_rule_version: string
   scoring_version: string
   benchmark_version: string
   norm_version: string | null
@@ -23,7 +25,7 @@ export async function findActiveConfigurationSet(
 ): Promise<ConfigurationSet | null> {
   const rows = await db.prepare(
     `SELECT config_set_id, task_version, material_version,
-            point_rule_version, scoring_version, benchmark_version,
+            point_rule_version, sunk_cost_rule_version, scoring_version, benchmark_version,
             norm_version
      FROM configuration_sets
      WHERE is_active = 1 AND status = 'published'
@@ -37,6 +39,7 @@ export async function findActiveConfigurationSet(
     taskVersion: row.task_version,
     materialVersion: row.material_version,
     pointRuleVersion: row.point_rule_version,
+    sunkCostRuleVersion: row.sunk_cost_rule_version,
     scoringVersion: row.scoring_version,
     benchmarkVersion: row.benchmark_version,
     normVersion: row.norm_version,

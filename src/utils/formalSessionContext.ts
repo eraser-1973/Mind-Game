@@ -10,6 +10,7 @@ const SESSION_STEPS = [
   'pre_task',
   'game_ready',
   'playing',
+  'post_task',
 ] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -47,6 +48,7 @@ export function isFormalSessionContext(
     typeof versions.task === 'string' &&
     typeof versions.material === 'string' &&
     typeof versions.pointRule === 'string' &&
+    typeof versions.sunkCostRule === 'string' &&
     typeof versions.scoring === 'string' &&
     typeof versions.benchmark === 'string' &&
     (versions.norm === null || typeof versions.norm === 'string')

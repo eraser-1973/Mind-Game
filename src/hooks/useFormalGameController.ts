@@ -4,6 +4,10 @@ import {
   startFormalGame,
   submitFormalRating,
   submitFormalStageChoice,
+  checkFormalSunkCost,
+  submitFormalSunkCostChoice,
+  submitActiveFinalDecision,
+  submitTimeoutFinalDecision,
 } from '../api/formalGame'
 import type {
   FormalEvidenceLevel,
@@ -12,6 +16,8 @@ import type {
   FormalGameStartResponse,
   FormalRatingResponse,
   FormalRatingStage,
+  FormalFinalDecision,
+  FormalSunkCostSnapshot,
 } from '../types/formalGame'
 import type { FormalSessionContext, PublicCandidateId } from '../types/game'
 import {
@@ -38,6 +44,8 @@ function snapshotFromStart(result: FormalGameStartResponse): FormalGameSnapshot 
     stageChoice: result.stageChoice,
     stageChoices: result.stageChoices,
     evidenceUnlocks: result.evidenceUnlocks,
+    sunkCost: null,
+    finalDecision: null,
   }
 }
 
@@ -63,6 +71,12 @@ export function useFormalGameController({
   const [pendingRating, setPendingRating] = useState<string | null>(null)
   const [pendingEvidence, setPendingEvidence] = useState<string | null>(null)
   const [choicePending, setChoicePending] = useState(false)
+  const [sunkCost, setSunkCost] = useState<FormalSunkCostSnapshot | null>(initialSnapshot?.sunkCost ?? null)
+  const [finalDecision, setFinalDecision] = useState<FormalFinalDecision | null>(initialSnapshot?.finalDecision ?? null)
+  const [stage6Pending, setStage6Pending] = useState<'show' | 'choice' | 'final' | 'timeout' | null>(null)
+  const [stage6Error, setStage6Error] = useState<string | null>(null)
+  const lastSunkCheck = useRef<string | null>(null)
+  const timeoutStarted = useRef(false)
   const startAttempted = useRef(false)
   const onSnapshotRef = useRef(onSnapshot)
 
@@ -71,6 +85,8 @@ export function useFormalGameController({
     if (!snapshot && initialSnapshot) {
       setSnapshot(initialSnapshot)
       setRemainingSec(initialSnapshot.remainingSec)
+      setSunkCost(initialSnapshot.sunkCost ?? null)
+      setFinalDecision(initialSnapshot.finalDecision ?? null)
     }
   }, [initialSnapshot, snapshot])
   useEffect(() => {
@@ -271,6 +287,120 @@ export function useFormalGameController({
     }
   }, [remainingSec, session.sessionId, snapshot])
 
+  const checkSunkCost = useCallback(async () => {
+    if (!snapshot || remainingSec <= 0 || remainingSec > 300 || sunkCost || finalDecision) return null
+    const signature = `${snapshot.lastSequenceNo ?? 0}:${remainingSec <= 300}`
+    if (lastSunkCheck.current === signature) return null
+    lastSunkCheck.current = signature
+    setStage6Pending('show')
+    setStage6Error(null)
+    const key = getOrCreateFormalGamePendingKey('sunk-cost-show')
+    try {
+      const result = await checkFormalSunkCost({
+        sessionId: session.sessionId,
+        clientShownAt: new Date().toISOString(),
+        clientSequence: snapshot.lastSequenceNo ?? 1,
+      }, key)
+      if (result.triggered) {
+        clearFormalGamePendingKey('sunk-cost-show')
+        setSunkCost(result)
+        setSnapshot((current) => current ? { ...current, sunkCost: result } : current)
+      }
+      return result
+    } catch (error) {
+      lastSunkCheck.current = null
+      setStage6Error(error instanceof Error ? error.message : '暂时无法确认决策检查点，请重试。')
+      return null
+    } finally {
+      setStage6Pending(null)
+    }
+  }, [finalDecision, remainingSec, session.sessionId, snapshot, sunkCost])
+
+  useEffect(() => { void checkSunkCost() }, [checkSunkCost])
+
+  const submitSunkChoice = useCallback(async (choice: 'continue' | 'stop_loss' | 'give_up') => {
+    if (!snapshot || !sunkCost?.sunkEventId || !sunkCost.required) return null
+    setStage6Pending('choice')
+    setStage6Error(null)
+    const key = getOrCreateFormalGamePendingKey('sunk-cost-choice')
+    try {
+      const result = await submitFormalSunkCostChoice({
+        sessionId: session.sessionId, sunkEventId: sunkCost.sunkEventId, choice,
+        clientSubmittedAt: new Date().toISOString(), clientSequence: snapshot.lastSequenceNo ?? 1,
+      }, key)
+      clearFormalGamePendingKey('sunk-cost-choice')
+      setSunkCost(result)
+      setSnapshot((current) => current ? {
+        ...current,
+        sunkCost: result,
+        currentStage: choice === 'give_up' ? 'DECISION' : current.currentStage,
+        stageStatus: choice === 'give_up' ? 'DECISION_COMPLETE' : current.stageStatus,
+      } : current)
+      return result
+    } catch (error) {
+      setStage6Error(error instanceof Error ? error.message : '决策检查点暂时无法保存，请重试。')
+      return null
+    } finally {
+      setStage6Pending(null)
+    }
+  }, [session.sessionId, snapshot, sunkCost])
+
+  const submitFinal = useCallback(async (candidateId: PublicCandidateId, confidence: number) => {
+    if (!snapshot || finalDecision || remainingSec <= 0) return null
+    setStage6Pending('final')
+    setStage6Error(null)
+    const key = getOrCreateFormalGamePendingKey('final-decision')
+    try {
+      const result = await submitActiveFinalDecision({
+        sessionId: session.sessionId, candidateId, confidence,
+        clientSubmittedAt: new Date().toISOString(), clientSequence: snapshot.lastSequenceNo ?? 1,
+      }, key)
+      clearFormalGamePendingKey('final-decision')
+      setFinalDecision(result)
+      setSnapshot((current) => current ? {
+        ...current, currentStage: 'DECISION', stageStatus: 'DECISION_COMPLETE',
+        finalDecision: result, lastSequenceNo: result.sequenceNo,
+      } : current)
+      return result
+    } catch (error) {
+      setStage6Error(error instanceof Error ? error.message : '最终录用结果暂时无法保存，请重试。')
+      return null
+    } finally {
+      setStage6Pending(null)
+    }
+  }, [finalDecision, remainingSec, session.sessionId, snapshot])
+
+  useEffect(() => {
+    if (!snapshot || remainingSec !== 0 || finalDecision || timeoutStarted.current) return
+    timeoutStarted.current = true
+    let active = true
+    const timeout = async () => {
+      setStage6Pending('timeout')
+      const key = getOrCreateFormalGamePendingKey('timeout-final-decision')
+      try {
+        const result = await submitTimeoutFinalDecision({
+          sessionId: session.sessionId, clientObservedAt: new Date().toISOString(),
+          clientSequence: snapshot.lastSequenceNo ?? 1,
+        }, key)
+        if (!active) return
+        clearFormalGamePendingKey('timeout-final-decision')
+        setFinalDecision(result)
+        setSnapshot((current) => current ? { ...current, currentStage: 'DECISION',
+          stageStatus: 'DECISION_COMPLETE', finalDecision: result,
+          lastSequenceNo: result.sequenceNo } : current)
+      } catch (error) {
+        if (active) {
+          timeoutStarted.current = false
+          setStage6Error(error instanceof Error ? error.message : '超时结果暂时无法封存，请重试。')
+        }
+      } finally {
+        if (active) setStage6Pending(null)
+      }
+    }
+    void timeout()
+    return () => { active = false }
+  }, [finalDecision, remainingSec, session.sessionId, snapshot])
+
   return {
     snapshot,
     remainingSec,
@@ -285,5 +415,12 @@ export function useFormalGameController({
     submitRating,
     submitChoice,
     unlockEvidence,
+    sunkCost,
+    finalDecision,
+    stage6Pending,
+    stage6Error,
+    checkSunkCost,
+    submitSunkChoice,
+    submitFinal,
   }
 }

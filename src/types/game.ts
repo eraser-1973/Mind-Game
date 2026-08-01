@@ -1,4 +1,4 @@
-import type { FormalGameSnapshot, PreGameResumeState } from './formalGame'
+import type { FormalFinalDecision, FormalGameSnapshot, FormalSunkCostSnapshot, PreGameResumeState } from './formalGame'
 
 export type RatingStage = 'T1' | 'T2' | 'T3'
 export type VerifyType = 'shallow' | 'deep'
@@ -12,6 +12,7 @@ export type FormalSessionStep =
   | 'pre_task'
   | 'game_ready'
   | 'playing'
+  | 'post_task'
 export type PublicCandidateId = 'A' | 'B' | 'C' | 'D' | 'E'
 export type CandidateDisplayOrder = [
   PublicCandidateId,
@@ -42,6 +43,7 @@ export type FormalSessionVersions = {
   task: string
   material: string
   pointRule: string
+  sunkCostRule: string
   scoring: string
   benchmark: string
   norm: string | null
@@ -121,6 +123,8 @@ export type FormalResumeData = {
     }>
   } | null
   game: PreGameResumeState | FormalGameSnapshot
+  sunkCost?: FormalSunkCostSnapshot | null
+  finalDecision?: FormalFinalDecision | null
 }
 
 export type Evidence = {

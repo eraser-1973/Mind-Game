@@ -10,6 +10,8 @@ import type {
   FormalStageChoice,
   FormalStageChoiceResponse,
   FormalStageStatus,
+  FormalSunkCostSnapshot,
+  FormalFinalDecision,
   FormalT1RatingResponse,
   FormalT1StageChoiceResponse,
 } from '../types/formalGame'
@@ -34,13 +36,13 @@ function isRatingStage(value: unknown): value is FormalRatingStage {
 }
 
 function isGameStage(value: unknown): value is FormalGameStage {
-  return value === 'T1' || value === 'T1_COMPLETE' || value === 'T2' || value === 'T3'
+  return value === 'T1' || value === 'T1_COMPLETE' || value === 'T2' || value === 'T3' || value === 'DECISION'
 }
 
 function isStageStatus(value: unknown): value is FormalStageStatus {
   return [
     'T1_ACTIVE', 'T1_COMPLETE', 'T2_ACTIVE', 'T2_COMPLETE',
-    'T3_ACTIVE', 'T3_COMPLETE',
+    'T3_ACTIVE', 'T3_COMPLETE', 'DECISION_COMPLETE',
   ].includes(String(value))
 }
 
@@ -169,6 +171,29 @@ export function parseFormalGameSnapshot(value: unknown): FormalGameSnapshot | nu
   return value as FormalGameSnapshot
 }
 
+function parseSunkCost(value: unknown): FormalSunkCostSnapshot | null {
+  if (!isRecord(value) || typeof value.created !== 'boolean' ||
+    typeof value.triggered !== 'boolean' || typeof value.required !== 'boolean') return null
+  if (!value.triggered) return value as FormalSunkCostSnapshot
+  if (typeof value.sunkEventId !== 'string' || !isCandidate(value.targetCandidateId) ||
+    !Number.isInteger(value.pointsInvestedBefore) || !isIso(value.shownAt) ||
+    ![null, 'continue', 'stop_loss', 'give_up'].includes(value.choice as null | string)) return null
+  return value as FormalSunkCostSnapshot
+}
+
+function parseFinalDecision(value: unknown): FormalFinalDecision | null {
+  if (!isRecord(value)) return null
+  if (typeof value.created !== 'boolean' || typeof value.finalDecisionId !== 'string' ||
+    !isCandidate(value.candidateId) || !isScore(value.confidence) ||
+    (value.submitMode !== 'active' && value.submitMode !== 'timeout') ||
+    !isRatingStage(value.sourceStage) ||
+    (value.selectionOrigin !== 'active_user' && value.selectionOrigin !== 'timeout_latest_sealed_choice') ||
+    typeof value.autoSelected !== 'boolean' || !isIso(value.serverSubmittedAt) ||
+    !Number.isInteger(value.sequenceNo) || !Number.isInteger(value.remainingSec) ||
+    !Number.isInteger(value.pointsRemaining) || value.currentStep !== 'post_task') return null
+  return value as FormalFinalDecision
+}
+
 export async function requestFormalGame<T>(
   path: string,
   body: unknown,
@@ -269,4 +294,36 @@ export function submitFormalT1StageChoice(
   fetchImpl: FetchLike = fetch,
 ): Promise<FormalT1StageChoiceResponse> {
   return submitFormalStageChoice({ ...input, stage: 'T1' }, idempotencyKey, fetchImpl) as Promise<FormalT1StageChoiceResponse>
+}
+
+export function checkFormalSunkCost(
+  input: { sessionId: string; clientShownAt: string; clientSequence?: number },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalSunkCostSnapshot> {
+  return requestFormalGame('/api/sunk-cost/show', input, idempotencyKey, parseSunkCost, fetchImpl)
+}
+
+export function submitFormalSunkCostChoice(
+  input: { sessionId: string; sunkEventId: string; choice: 'continue' | 'stop_loss' | 'give_up'; clientSubmittedAt: string; clientSequence?: number },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalSunkCostSnapshot> {
+  return requestFormalGame('/api/sunk-cost/choice', input, idempotencyKey, parseSunkCost, fetchImpl)
+}
+
+export function submitActiveFinalDecision(
+  input: { sessionId: string; candidateId: PublicCandidateId; confidence: number; clientSubmittedAt: string; clientSequence?: number },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalFinalDecision> {
+  return requestFormalGame('/api/final-decision', input, idempotencyKey, parseFinalDecision, fetchImpl)
+}
+
+export function submitTimeoutFinalDecision(
+  input: { sessionId: string; clientObservedAt: string; clientSequence?: number },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalFinalDecision> {
+  return requestFormalGame('/api/final-decision/timeout', input, idempotencyKey, parseFinalDecision, fetchImpl)
 }

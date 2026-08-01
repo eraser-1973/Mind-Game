@@ -2,7 +2,7 @@ import type { CandidateDisplayOrder, PublicCandidateId } from './game'
 
 export type FormalRatingStage = 'T1' | 'T2' | 'T3'
 export type FormalEvidenceLevel = 'shallow' | 'deep'
-export type FormalGameStage = 'T1' | 'T1_COMPLETE' | 'T2' | 'T3'
+export type FormalGameStage = 'T1' | 'T1_COMPLETE' | 'T2' | 'T3' | 'DECISION'
 export type FormalStageStatus =
   | 'T1_ACTIVE'
   | 'T1_COMPLETE'
@@ -10,6 +10,38 @@ export type FormalStageStatus =
   | 'T2_COMPLETE'
   | 'T3_ACTIVE'
   | 'T3_COMPLETE'
+  | 'DECISION_COMPLETE'
+
+export type FormalSunkCostChoice = 'continue' | 'stop_loss' | 'give_up' | 'not_triggered' | null
+
+export type FormalSunkCostSnapshot = {
+  created: boolean
+  triggered: boolean
+  required: boolean
+  sunkEventId?: string
+  targetCandidateId?: PublicCandidateId | null
+  pointsInvestedBefore?: number
+  shownAt?: string | null
+  choice?: FormalSunkCostChoice
+  choiceSubmittedAt?: string | null
+  pointsAfterChoice?: number | null
+}
+
+export type FormalFinalDecision = {
+  created: boolean
+  finalDecisionId: string
+  candidateId: PublicCandidateId
+  confidence: number
+  submitMode: 'active' | 'timeout'
+  sourceStage: FormalRatingStage
+  selectionOrigin: 'active_user' | 'timeout_latest_sealed_choice'
+  autoSelected: boolean
+  serverSubmittedAt: string
+  sequenceNo: number
+  remainingSec: number
+  pointsRemaining: number
+  currentStep: 'post_task'
+}
 
 export type FormalRating = {
   candidateId: PublicCandidateId
@@ -65,6 +97,8 @@ export type FormalGameSnapshot = {
   stageChoices: FormalStageChoice[]
   evidenceUnlocks: FormalEvidenceUnlock[]
   lastSequenceNo?: number
+  sunkCost?: FormalSunkCostSnapshot | null
+  finalDecision?: FormalFinalDecision | null
 }
 
 export type FormalGameStartResponse = Omit<FormalGameSnapshot, 'started' | 'resumeSupported' | 'lastSequenceNo'> & {

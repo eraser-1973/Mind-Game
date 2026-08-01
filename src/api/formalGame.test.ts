@@ -5,6 +5,10 @@ import {
   submitFormalStageChoice,
   submitFormalT1Rating,
   submitFormalT1StageChoice,
+  checkFormalSunkCost,
+  submitFormalSunkCostChoice,
+  submitActiveFinalDecision,
+  submitTimeoutFinalDecision,
 } from './formalGame'
 
 function envelope(data: unknown, status = 200) {
@@ -103,5 +107,43 @@ describe('formal game API client', () => {
       clientSubmittedAt: '2026-08-01T00:10:00.000Z', clientSequence: 13,
     }, 'event-t3-choice', fetcher)
     expect(result).toMatchObject({ stage: 'T3', stageStatus: 'T3_COMPLETE' })
+  })
+
+  it('uses dedicated safe Stage 6 endpoints without sending server-owned facts', async () => {
+    const sunk = {
+      created: true, triggered: true, required: true,
+      sunkEventId: '11111111-1111-4111-8111-111111111111',
+      targetCandidateId: 'A', pointsInvestedBefore: 2,
+      shownAt: '2026-08-01T00:10:00.000Z', choice: null,
+      choiceSubmittedAt: null, pointsAfterChoice: null,
+    }
+    const final = {
+      created: true, finalDecisionId: '22222222-2222-4222-8222-222222222222',
+      candidateId: 'B', confidence: 0, submitMode: 'active', sourceStage: 'T2',
+      selectionOrigin: 'active_user', autoSelected: false,
+      serverSubmittedAt: '2026-08-01T00:11:00.000Z', sequenceNo: 12,
+      remainingSec: 240, pointsRemaining: 3, currentStep: 'post_task',
+    }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(envelope(sunk, 201))
+      .mockResolvedValueOnce(envelope({ ...sunk, created: true, required: false,
+        choice: 'stop_loss', choiceSubmittedAt: '2026-08-01T00:10:10.000Z', pointsAfterChoice: 0 }, 201))
+      .mockResolvedValueOnce(envelope(final, 201))
+      .mockResolvedValueOnce(envelope({ ...final, submitMode: 'timeout', sourceStage: 'T3',
+        selectionOrigin: 'timeout_latest_sealed_choice', autoSelected: true }, 201))
+
+    await checkFormalSunkCost({ sessionId: 'session-1', clientShownAt: snapshot.serverNow }, 'k1', fetcher)
+    await submitFormalSunkCostChoice({ sessionId: 'session-1', sunkEventId: sunk.sunkEventId,
+      choice: 'stop_loss', clientSubmittedAt: snapshot.serverNow }, 'k2', fetcher)
+    await submitActiveFinalDecision({ sessionId: 'session-1', candidateId: 'B', confidence: 0,
+      clientSubmittedAt: snapshot.serverNow }, 'k3', fetcher)
+    await submitTimeoutFinalDecision({ sessionId: 'session-1', clientObservedAt: snapshot.serverNow }, 'k4', fetcher)
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      '/api/sunk-cost/show', '/api/sunk-cost/choice', '/api/final-decision',
+      '/api/final-decision/timeout',
+    ])
+    const bodies = fetcher.mock.calls.map((call) => JSON.parse(String(call[1]?.body)))
+    expect(JSON.stringify(bodies)).not.toMatch(/riskEvidence|pointsInvested|sourceStage|submitMode/)
   })
 })

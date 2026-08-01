@@ -294,6 +294,7 @@ export async function loadResumeProjection(
         task: session.taskVersion,
         material: session.materialVersion,
         pointRule: session.pointRuleVersion,
+        sunkCostRule: session.sunkCostRuleVersion,
         scoring: session.scoringVersion,
         benchmark: session.benchmarkVersion,
         norm: session.normVersion,

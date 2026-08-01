@@ -14,6 +14,7 @@ export type SessionRow = {
   task_version: string
   material_version: string
   point_rule_version: string
+  sunk_cost_rule_version: string
   scoring_version: string
   benchmark_version: string
   norm_version: string | null
@@ -29,7 +30,7 @@ export async function findSessionByCreationKey(
 ): Promise<SessionRow | null> {
   return db.prepare(
     `SELECT session_id, participant_id, creation_key, mode, config_set_id,
-            task_version, material_version, point_rule_version,
+            task_version, material_version, point_rule_version, sunk_cost_rule_version,
             scoring_version, benchmark_version, norm_version,
             candidate_display_order, initial_opened_candidate,
             current_step, created_at
@@ -55,14 +56,14 @@ export function buildSessionInsertStatements(
     db.prepare(
       `INSERT INTO sessions (
         session_id, participant_id, creation_key, mode, config_set_id,
-        task_version, material_version, point_rule_version, scoring_version,
+        task_version, material_version, point_rule_version, sunk_cost_rule_version, scoring_version,
         benchmark_version, norm_version, candidate_display_order,
         initial_opened_candidate, completion_status, current_step,
         final_submit_mode, client_version, duplicate_student_id,
         duplicate_phone, prior_identity_match_count, error_count,
         created_at, started_at, deadline_at, ended_at
       ) VALUES (
-        ?, ?, ?, 'formal', ?, ?, ?, ?, ?, ?, ?, json(?), ?,
+        ?, ?, ?, 'formal', ?, ?, ?, ?, ?, ?, ?, ?, json(?), ?,
         'in_progress', 'consent_pending', 'none', ?, ?, ?, ?, 0,
         ?, NULL, NULL, NULL
       )`,
@@ -74,6 +75,7 @@ export function buildSessionInsertStatements(
       input.config.taskVersion,
       input.config.materialVersion,
       input.config.pointRuleVersion,
+      input.config.sunkCostRuleVersion,
       input.config.scoringVersion,
       input.config.benchmarkVersion,
       input.config.normVersion,
@@ -124,6 +126,7 @@ export type SafeSessionData = {
     task: string
     material: string
     pointRule: string
+    sunkCostRule: string
     scoring: string
     benchmark: string
     norm: string | null
@@ -155,6 +158,7 @@ export function projectSafeSession(row: SessionRow): SafeSessionData {
       task: row.task_version,
       material: row.material_version,
       pointRule: row.point_rule_version,
+      sunkCostRule: row.sunk_cost_rule_version,
       scoring: row.scoring_version,
       benchmark: row.benchmark_version,
       norm: row.norm_version,

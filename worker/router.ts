@@ -14,6 +14,12 @@ import {
   handleQuestionnaires,
   handleSessionResume,
 } from './routes/researchIntake'
+import {
+  handleActiveFinalDecision,
+  handleSunkCostChoice,
+  handleSunkCostShow,
+  handleTimeoutFinalDecision,
+} from './routes/sunkCostFinal'
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
@@ -54,6 +60,22 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
 
   if (url.pathname === '/api/evidence/unlock') {
     return handleEvidenceUnlock(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/sunk-cost/show') {
+    return handleSunkCostShow(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/sunk-cost/choice') {
+    return handleSunkCostChoice(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/final-decision') {
+    return handleActiveFinalDecision(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/final-decision/timeout') {
+    return handleTimeoutFinalDecision(request, env, requestId)
   }
 
   const startMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/start$/)

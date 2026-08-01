@@ -342,7 +342,7 @@ describe('T1 stage choice, expiry, and resume', () => {
     } } })
   })
 
-  it('rejects writes after server deadline and records expiry once without completing', async () => {
+  it('rejects writes after server deadline and records expiry once without inventing a choice', async () => {
     const session = await makeGameReady()
     await start(session)
     await db.prepare(`UPDATE sessions SET started_at = ?, deadline_at = ? WHERE session_id = ?`)
@@ -352,7 +352,7 @@ describe('T1 stage choice, expiry, and resume', () => {
     const first = await rate(session, 'A', 50)
     const second = await rate(session, 'B', 50)
     expect([first.status, second.status]).toEqual([409, 409])
-    expect(await first.text()).toContain('GAME_TIME_EXPIRED')
+    expect(await first.text()).toContain('GAME_EXPIRED')
     const state = await db.prepare(`SELECT s.completion_status, g.time_expired_at,
       g.last_sequence_no FROM sessions s JOIN game_runs g USING (session_id)
       WHERE s.session_id = ?`).bind(session.sessionId).first<Record<string, unknown>>()

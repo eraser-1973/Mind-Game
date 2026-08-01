@@ -25,7 +25,7 @@ vi.mock('../api/formalEvidence', () => ({ unlockFormalEvidence: api.unlock }))
 import { FormalEvidencePanel } from './FormalEvidencePanel'
 import { FormalCandidateDetail } from './FormalCandidateDetail'
 import { FormalGameScreen } from './FormalGameScreen'
-import { FormalInvestigationStatus } from './FormalInvestigationStatus'
+import { FormalFinalDecisionPanel } from './FormalFinalDecisionPanel'
 import { FormalRatingPanel } from './FormalRatingPanel'
 import { NikoChatPanel } from './NikoChatPanel'
 import { StageChoicePanel } from './StageChoicePanel'
@@ -44,7 +44,7 @@ const context: FormalSessionContext = {
   sessionId: '22222222-2222-4222-8222-222222222222',
   configSetId: 'config-2026-07-v1',
   versions: {
-    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1',
+    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1', sunkCostRule: 'sunk-1.0.0',
     scoring: 'RDI-2.0-prepilot', benchmark: 'benchmark-1.0.0', norm: null,
   },
   candidateDisplayOrder: ['B', 'A', 'E', 'C', 'D'],
@@ -185,18 +185,17 @@ describe('FormalGameScreen Stage 5 server state', () => {
     expect(choice.props.title).toBe('证据初步核验后的选择')
   })
 
-  it('shows the Stage 5 pause state after T3 is sealed and never renders a final decision', () => {
+  it('opens the Stage 6 final decision after T3 is sealed', () => {
     renderer = create(<FormalGameScreen session={context} initialSnapshot={{
       ...baseSnapshot, currentStage: 'T3', stageStatus: 'T3_COMPLETE',
       points: { total: 5, remaining: 1 }, lastSequenceNo: 13,
     }} onExit={vi.fn()} />)
-    const status = renderer.root.findByType(FormalInvestigationStatus)
-    expect(status.props.kind).toBe('t3-complete')
-    expect(JSON.stringify(renderer.toJSON())).toContain('最终录用将在下一阶段接入')
-    expect(JSON.stringify(renderer.toJSON())).not.toContain('提交最终录用')
+    const panel = renderer.root.findByType(FormalFinalDecisionPanel)
+    expect(panel.props.title).toBe('锁定最终录用人选')
+    expect(panel.props.canSubmit).toBe(false)
   })
 
-  it('keeps an expired T2 stage choice visible but disables every write control', () => {
+  it('moves an expired T2 stage to server timeout finalization instead of accepting writes', () => {
     const t2Rating = {
       candidateId: 'B' as const, stage: 'T2' as const, ratingValue: 75,
       evidenceIdsSeen: ['B-t2-1', 'B-t2-2'], sealed: true as const,
@@ -207,8 +206,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
       expired: true, remainingSec: 0, points: { total: 5, remaining: 4 },
       evidenceUnlocks: [shallowB], ratings: [...t1Ratings, t2Rating], lastSequenceNo: 9,
     }} onExit={vi.fn()} />)
-    const choice = renderer.root.findByType(StageChoicePanel)
-    expect(choice.props.disabled).toBe(true)
-    expect(renderer.root.findByProps({ 'data-testid': 'submit-t2-stage-choice' }).props.disabled).toBe(true)
+    expect(renderer.root.findAllByProps({ 'data-testid': 'formal-timeout-saving' })).toHaveLength(1)
+    expect(renderer.root.findAllByType(StageChoicePanel)).toHaveLength(0)
   })
 })

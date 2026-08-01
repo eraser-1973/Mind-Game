@@ -17,6 +17,8 @@ import {
   loadEvidenceUnlockRows,
   projectEvidenceUnlockForResume,
 } from './formalEvidence'
+import { assertNoPendingSunkCost, finalizeExpiredFormalGame } from './sunkCostFinal'
+import { loadSafeFinalDecision, loadSafeSunkCost } from './sunkCostFinal'
 
 export { FormalGameError } from '../domain/formalGameError'
 
@@ -236,7 +238,9 @@ async function projectRun(
     remainingSec: clock.remainingSec,
     expired: clock.expired,
     currentStage: run.current_stage,
-    stageStatus: deriveFormalStageStatus(run.current_stage, choices.map(({ stage }) => stage)),
+    stageStatus: run.current_stage === 'DECISION'
+      ? 'DECISION_COMPLETE' as const
+      : deriveFormalStageStatus(run.current_stage, choices.map(({ stage }) => stage)),
     points: { total: run.points_total, remaining: run.points_remaining },
     ratings: ratings.map(ratingProjection),
     stageChoice: t1Choice,
@@ -388,9 +392,16 @@ async function requireWritableRun(
   if (!run) throw conflict('GAME_NOT_STARTED', 'The formal game has not started.')
   const now = new Date()
   if (createGameClockSnapshot(run.started_at, run.deadline_at, now).expired) {
-    await recordExpiry(db, run, now)
-    throw conflict('GAME_TIME_EXPIRED', 'The formal game time has expired.')
+    try {
+      await finalizeExpiredFormalGame(
+        db, session, crypto.randomUUID(), now.toISOString(), null,
+      )
+    } catch {
+      // The session may have no sealed stage choice; expiry is still authoritative.
+    }
+    throw conflict('GAME_EXPIRED', 'The formal game time has expired.')
   }
+  await assertNoPendingSunkCost(db, session.sessionId)
   return run
 }
 
@@ -705,7 +716,7 @@ export async function loadFormalGameResume(
   db: D1Database,
   session: AuthenticatedSession,
 ) {
-  if (session.currentStep !== 'playing') {
+  if (session.currentStep !== 'playing' && session.currentStep !== 'post_task') {
     throw conflict('GAME_RESUME_NOT_READY', 'The formal game is not in a resumable state.')
   }
   const run = await findRun(db, session.sessionId)
@@ -726,18 +737,21 @@ export async function loadFormalGameResume(
         task: session.taskVersion,
         material: session.materialVersion,
         pointRule: session.pointRuleVersion,
+        sunkCostRule: session.sunkCostRuleVersion,
         scoring: session.scoringVersion,
         benchmark: session.benchmarkVersion,
         norm: session.normVersion,
       },
       candidateDisplayOrder,
       initialOpenedCandidate: session.initialOpenedCandidate,
-      currentStep: 'playing' as const,
+      currentStep: session.currentStep as 'playing' | 'post_task',
       createdAt: session.createdAt,
     },
     consent: null,
     demographics: null,
     preTask: null,
     game: await projectRun(db, session, run),
+    sunkCost: await loadSafeSunkCost(db, session.sessionId),
+    finalDecision: await loadSafeFinalDecision(db, session.sessionId),
   }
 }

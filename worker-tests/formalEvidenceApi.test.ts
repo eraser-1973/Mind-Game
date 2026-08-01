@@ -215,7 +215,7 @@ describe('formal shallow evidence unlock', () => {
     const session = await seedT1Complete({ deadlineAt: new Date(Date.now() - 1_000).toISOString() })
     const response = await unlock(session)
     expect(response.status).toBe(409)
-    expect(await response.text()).toContain('GAME_TIME_EXPIRED')
+    expect(await response.text()).toContain('GAME_EXPIRED')
     const count = await db.prepare('SELECT COUNT(*) AS count FROM evidence_events WHERE session_id = ?')
       .bind(session.sessionId).first<{ count: number }>()
     expect(count?.count).toBe(0)

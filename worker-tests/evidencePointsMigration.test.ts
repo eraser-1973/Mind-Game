@@ -46,7 +46,7 @@ async function seedPlayingSession(db: D1Database) {
 
 describe('0005 evidence, points, T2, and T3 migration', () => {
   it('creates the Stage 5 tables, indexes, published rule, and schema version 5', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0005_evidence_points_t2_t3.sql' })
     runtime = created.runtime
     const tables = await created.db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
@@ -85,7 +85,7 @@ describe('0005 evidence, points, T2, and T3 migration', () => {
   })
 
   it('seeds the exact five-candidate evidence shape for material-1.0.0', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0005_evidence_points_t2_t3.sql' })
     runtime = created.runtime
     const rows = await created.db.prepare(`SELECT candidate_id, evidence_level,
       COUNT(*) AS count FROM candidate_evidence_items
@@ -150,7 +150,7 @@ describe('0005 evidence, points, T2, and T3 migration', () => {
   })
 
   it('enforces evidence event balances, uniqueness, item foreign keys, and ledger arithmetic', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0005_evidence_points_t2_t3.sql' })
     runtime = created.runtime
     const { sessionId, now } = await seedPlayingSession(created.db)
     const eventId = crypto.randomUUID()
@@ -201,7 +201,7 @@ describe('0005 evidence, points, T2, and T3 migration', () => {
   })
 
   it('cascades Stage 5 session facts while retaining versioned configuration', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0005_evidence_points_t2_t3.sql' })
     runtime = created.runtime
     const { sessionId, now } = await seedPlayingSession(created.db)
     const eventId = crypto.randomUUID()

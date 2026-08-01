@@ -4,6 +4,7 @@ import { createGameClockSnapshot } from '../domain/gameClock'
 import { deriveFormalStageStatus } from '../domain/formalStage'
 import { FormalGameError } from '../domain/formalGameError'
 import type { EvidenceUnlockInput } from '../validation/formalGameRequest'
+import { assertNoPendingSunkCost, finalizeExpiredFormalGame } from './sunkCostFinal'
 
 type EvidenceLevel = 'shallow' | 'deep'
 
@@ -198,8 +199,16 @@ async function requireBaseState(
   const run = await findRun(db, session.sessionId)
   if (!run) throw conflict('GAME_NOT_STARTED', 'The formal game has not started.')
   if (createGameClockSnapshot(run.started_at, run.deadline_at, new Date()).expired) {
-    throw conflict('GAME_TIME_EXPIRED', 'The formal game time has expired.')
+    try {
+      await finalizeExpiredFormalGame(
+        db, session, crypto.randomUUID(), input.clientAt, input.clientSequence,
+      )
+    } catch {
+      // Never permit the original evidence write after the server deadline.
+    }
+    throw conflict('GAME_EXPIRED', 'The formal game time has expired.')
   }
+  await assertNoPendingSunkCost(db, session.sessionId)
   const t1 = await db.prepare(`SELECT
     (SELECT COUNT(*) FROM stage_ratings WHERE session_id = ? AND stage = 'T1') AS rating_count,
     (SELECT COUNT(*) FROM stage_choices WHERE session_id = ? AND stage = 'T1') AS choice_count`)

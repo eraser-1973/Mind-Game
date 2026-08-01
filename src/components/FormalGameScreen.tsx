@@ -17,9 +17,10 @@ import { createNikoFeedbackFromEvidence } from '../utils/nikoFeedback'
 import { CandidateList } from './CandidateList'
 import { FormalCandidateDetail } from './FormalCandidateDetail'
 import { FormalEvidencePanel } from './FormalEvidencePanel'
-import { FormalInvestigationStatus } from './FormalInvestigationStatus'
 import { FormalRatingPanel } from './FormalRatingPanel'
-import { FormalT1CompletePanel } from './FormalT1CompletePanel'
+import { FormalSunkCostModal } from './FormalSunkCostModal'
+import { FormalFinalDecisionPanel } from './FormalFinalDecisionPanel'
+import { FormalPostTaskPause } from './FormalPostTaskPause'
 import { HRChatPanel } from './HRChatPanel'
 import { NikoChatPanel } from './NikoChatPanel'
 import { StageChoicePanel } from './StageChoicePanel'
@@ -65,6 +66,10 @@ export function FormalGameScreen({
   const controller = useFormalGameController({ session, initialSnapshot, onSnapshot })
   const [selectedId, setSelectedId] = useState<PublicCandidateId>(session.initialOpenedCandidate)
   const [nikoMessages, setNikoMessages] = useState<NikoMessage[]>([])
+  const [showFinalDecision, setShowFinalDecision] = useState(false)
+  const [finalCandidateId, setFinalCandidateId] = useState<PublicCandidateId | null>(null)
+  const [finalConfidence, setFinalConfidence] = useState(0)
+  const [finalConfidenceTouched, setFinalConfidenceTouched] = useState(false)
   const orderedCandidates = useMemo(() => session.candidateDisplayOrder
     .map((candidateId) => candidateById[candidateId])
     .filter((candidate): candidate is Candidate => Boolean(candidate)), [session.candidateDisplayOrder])
@@ -89,8 +94,36 @@ export function FormalGameScreen({
   const elapsedSec = 900 - controller.remainingSec
   const t1Ratings = snapshot.ratings.filter(({ stage }) => stage === 'T1')
 
-  if (controller.expired && snapshot.currentStage === 'T1') {
-    return <FormalT1CompletePanel expired />
+  if (controller.finalDecision) {
+    return <FormalPostTaskPause submitMode={controller.finalDecision.submitMode} />
+  }
+
+  if (controller.sunkCost?.required && controller.sunkCost.targetCandidateId) {
+    const target = candidateById[controller.sunkCost.targetCandidateId]
+    return (
+      <main className="game-screen" data-testid="formal-sunk-cost-gate">
+        <TimerBar timeLeftSec={controller.remainingSec} durationSec={900} elapsedSec={elapsedSec} availablePoints={snapshot.points.remaining} mode="formal" />
+        <FormalSunkCostModal
+          candidate={target}
+          pointsInvested={controller.sunkCost.pointsInvestedBefore ?? 0}
+          pending={controller.stage6Pending === 'choice'}
+          error={controller.stage6Error}
+          onChoose={(choice) => void controller.submitSunkChoice(choice)}
+        />
+      </main>
+    )
+  }
+
+  if (controller.expired) {
+    return (
+      <main className="research-screen" data-testid="formal-timeout-saving">
+        <section className="research-card"><span className="eyebrow">TIME EXPIRED</span>
+          <h1>正在安全封存本轮结果</h1>
+          <p className="research-card__lead">服务器将依据最近一次已封存的阶段选择记录超时结果。</p>
+          {controller.stage6Error && <p className="form-error">{controller.stage6Error}</p>}
+        </section>
+      </main>
+    )
   }
 
   if (snapshot.currentStage === 'T1' && t1Ratings.length === 5) {
@@ -135,11 +168,32 @@ export function FormalGameScreen({
     )
   }
 
-  if (snapshot.stageStatus === 'T3_COMPLETE') {
-    return <FormalInvestigationStatus kind="t3-complete" />
-  }
-  if (snapshot.stageStatus === 'T2_COMPLETE' && snapshot.points.remaining < 3) {
-    return <FormalInvestigationStatus kind="t2-complete-no-deep" />
+  const mustDecide = snapshot.stageStatus === 'T3_COMPLETE' ||
+    snapshot.stageStatus === 'DECISION_COMPLETE' ||
+    (snapshot.stageStatus === 'T2_COMPLETE' && snapshot.points.remaining < 3)
+  if (mustDecide || showFinalDecision) {
+    const canSubmit = finalCandidateId !== null && finalConfidenceTouched &&
+      controller.stage6Pending !== 'final'
+    return (
+      <FormalFinalDecisionPanel
+        title="锁定最终录用人选"
+        candidates={orderedCandidates}
+        selectedId={finalCandidateId}
+        confidence={finalConfidence}
+        confidenceTouched={finalConfidenceTouched}
+        canSubmit={canSubmit}
+        pending={controller.stage6Pending === 'final'}
+        error={controller.stage6Error}
+        onSelect={setFinalCandidateId}
+        onConfidenceChange={(value) => { setFinalConfidence(value); setFinalConfidenceTouched(true) }}
+        onSubmit={() => {
+          if (finalCandidateId && finalConfidenceTouched) {
+            void controller.submitFinal(finalCandidateId, finalConfidence)
+          }
+        }}
+        onBack={mustDecide ? undefined : () => setShowFinalDecision(false)}
+      />
+    )
   }
 
   const shallowUnlocks = snapshot.evidenceUnlocks.filter(({ level }) => level === 'shallow')
@@ -276,6 +330,11 @@ export function FormalGameScreen({
       <footer className="action-dock">
         <div><span className="eyebrow">当前任务</span><strong>可以用查证点数，比较证据并锁定阶段判断。</strong></div>
         <span className="formal-stage-chip">{snapshot.stageStatus}</span>
+        {snapshot.stageStatus === 'T2_COMPLETE' && (
+          <button className="button button--primary button--compact" onClick={() => setShowFinalDecision(true)}>
+            进入最终决策
+          </button>
+        )}
       </footer>
     </main>
   )

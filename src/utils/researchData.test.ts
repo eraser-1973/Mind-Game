@@ -83,6 +83,7 @@ describe('researchData utilities', () => {
           task: 'task-1.0.0',
           material: 'material-1.0.0',
           pointRule: 'points-5-v1',
+          sunkCostRule: 'sunk-1.0.0',
           scoring: 'RDI-2.0-prepilot',
           benchmark: 'benchmark-1.0.0',
           norm: null,

@@ -166,12 +166,14 @@ function parseResume(value: unknown): FormalResumeData | null {
     value.game.durationSec === 900 &&
     Number.isInteger(value.game.remainingSec) &&
     typeof value.game.expired === 'boolean' &&
-    (value.game.currentStage === 'T1' || value.game.currentStage === 'T1_COMPLETE') &&
+    ['T1', 'T1_COMPLETE', 'T2', 'T3', 'DECISION'].includes(String(value.game.currentStage)) &&
     isRecord(value.game.points) &&
-    value.game.points.total === 5 && value.game.points.remaining === 5 &&
+    value.game.points.total === 5 && Number.isInteger(value.game.points.remaining) &&
+    (value.game.points.remaining as number) >= 0 && (value.game.points.remaining as number) <= 5 &&
     Array.isArray(value.game.ratings) &&
     (value.game.stageChoice === null || isRecord(value.game.stageChoice))
   if (!preGame && !playing) return null
+  if (value.session.currentStep === 'post_task' && !isRecord(value.finalDecision)) return null
   return value as FormalResumeData
 }
 

@@ -61,7 +61,7 @@ const context: FormalSessionContext = {
   sessionId: '22222222-2222-4222-8222-222222222222',
   configSetId: 'config-2026-07-v1',
   versions: {
-    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1',
+    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1', sunkCostRule: 'sunk-1.0.0',
     scoring: 'RDI-2.0-prepilot', benchmark: 'benchmark-1.0.0', norm: null,
   },
   candidateDisplayOrder: ['D', 'B', 'E', 'A', 'C'],
@@ -303,7 +303,9 @@ describe('App formal refresh recovery', () => {
     }))
     await renderApp()
     const game = renderer!.root.findByType(GameScreen)
-    expect(game.props.formalGameSnapshot).toEqual(gameSnapshot)
+    expect(game.props.formalGameSnapshot).toEqual({
+      ...gameSnapshot, sunkCost: null, finalDecision: null,
+    })
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       `/api/sessions/${context.sessionId}/resume`,

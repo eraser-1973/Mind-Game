@@ -39,7 +39,7 @@ const context: FormalSessionContext = {
   sessionId: '22222222-2222-4222-8222-222222222222',
   configSetId: 'config-2026-07-v1',
   versions: {
-    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1',
+    task: 'task-1.0.0', material: 'material-1.0.0', pointRule: 'points-5-v1', sunkCostRule: 'sunk-1.0.0',
     scoring: 'RDI-2.0-prepilot', benchmark: 'benchmark-1.0.0', norm: null,
   },
   candidateDisplayOrder: ['B', 'A', 'E', 'C', 'D'],
@@ -139,7 +139,7 @@ describe('FormalT1GameScreen server state behavior', () => {
 
   it('locks all submissions on an expired server snapshot', () => {
     renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, expired: true, remainingSec: 0 }} onExit={vi.fn()} />)
-    expect(renderer.root.findByType(FormalT1CompletePanel).props.expired).toBe(true)
+    expect(renderer.root.findAllByProps({ 'data-testid': 'formal-timeout-saving' })).toHaveLength(1)
     expect(renderer.root.findAllByType(FormalCandidateDetail)).toHaveLength(0)
   })
 })

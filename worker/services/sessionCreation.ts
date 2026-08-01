@@ -115,6 +115,7 @@ export async function createOrReplayFormalSession(
           task: config.taskVersion,
           material: config.materialVersion,
           pointRule: config.pointRuleVersion,
+          sunkCostRule: config.sunkCostRuleVersion,
           scoring: config.scoringVersion,
           benchmark: config.benchmarkVersion,
           norm: config.normVersion,
