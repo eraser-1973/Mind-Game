@@ -34,6 +34,12 @@ function splitMigrationStatements(source: string): string[] {
   return statements
 }
 
+export async function applyMigrationSource(db: D1Database, source: string) {
+  for (const statement of splitMigrationStatements(source)) {
+    await db.prepare(statement).run()
+  }
+}
+
 async function getBundledWorker(): Promise<string> {
   bundledWorker ??= build({
     entryPoints: [workerEntry],
@@ -66,9 +72,7 @@ export async function createWorkerRuntime(options?: {
 
     for (const name of migrationNames) {
       const migration = await readFile(join(migrationsDirectory, name), 'utf8')
-      for (const statement of splitMigrationStatements(migration)) {
-        await db.prepare(statement).run()
-      }
+      await applyMigrationSource(db, migration)
 
       if (name === options?.throughMigration) break
     }

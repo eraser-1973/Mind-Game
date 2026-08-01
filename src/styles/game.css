@@ -1635,6 +1635,87 @@ p {
   color: #f3c885 !important;
 }
 
+.formal-investigation-layout .candidate-detail {
+  overflow: visible;
+}
+
+.formal-evidence-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.formal-points-readout,
+.formal-stage-chip {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  color: var(--cyan);
+  background: rgba(34, 137, 177, 0.08);
+  font-family: Consolas, monospace;
+  font-size: 0.68rem;
+}
+
+.formal-evidence-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.formal-evidence-action > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.formal-evidence-action strong { font-size: 0.78rem; }
+.formal-evidence-action small { color: var(--muted); font-size: 0.62rem; line-height: 1.5; }
+
+.formal-sealed-mark {
+  color: var(--cyan);
+  font-family: Consolas, monospace;
+  font-size: 0.66rem;
+}
+
+.formal-evidence-bundle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.formal-evidence-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(99, 221, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(34, 137, 177, 0.055);
+}
+
+.formal-evidence-card strong { font-size: 0.78rem; }
+.formal-evidence-card p { margin: 0; color: var(--muted); font-size: 0.67rem; line-height: 1.65; }
+
+.formal-rating-panel {
+  padding: 1.2rem 1.4rem;
+}
+
+.formal-stage-choice__warning {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  color: #b7c7d7 !important;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.68rem;
+}
+
+.formal-stage-stop .research-card {
+  border-color: rgba(99, 221, 255, 0.28);
+}
+
 .decision-card > strong { margin-top: 1rem; font-size: 1rem; }
 .decision-card > small { min-height: 42px; margin-top: 0.3rem; color: var(--muted); font-size: 0.64rem; line-height: 1.5; }
 .decision-card > div { display: grid; gap: 0.35rem; margin-top: auto; color: #7891a9; font-size: 0.6rem; }
@@ -1992,6 +2073,8 @@ p {
   .section-title-row { align-items: flex-start; flex-direction: column; }
   .rating-control { grid-template-columns: auto 1fr auto; }
   .rating-control output { grid-column: 1 / -1; }
+  .formal-evidence-action { align-items: stretch; flex-direction: column; }
+  .formal-evidence-bundle { grid-template-columns: 1fr; }
 
   .action-dock {
     align-items: stretch;

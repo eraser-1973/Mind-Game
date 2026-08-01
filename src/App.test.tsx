@@ -48,9 +48,12 @@ const gameSnapshot = {
   remainingSec: 900,
   expired: false,
   currentStage: 'T1' as const,
+  stageStatus: 'T1_ACTIVE' as const,
   points: { total: 5 as const, remaining: 5 as const },
   ratings: [],
   stageChoice: null,
+  stageChoices: [],
+  evidenceUnlocks: [],
   lastSequenceNo: 1,
 }
 const context: FormalSessionContext = {

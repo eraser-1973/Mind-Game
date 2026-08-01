@@ -202,12 +202,15 @@ describe('formal T1 ratings', () => {
     expect(await response.text()).toContain(code)
   })
 
-  it.each(['T2', 'T3'])('rejects unavailable stage %s', async (stage) => {
+  it.each([
+    ['T2', 'SHALLOW_EVIDENCE_REQUIRED'],
+    ['T3', 'SHALLOW_EVIDENCE_REQUIRED'],
+  ])('rejects unavailable stage %s before evidence is unlocked', async (stage, code) => {
     const session = await makeGameReady()
     await start(session)
     const response = await rate(session, 'A', 50, crypto.randomUUID(), { stage })
     expect(response.status).toBe(409)
-    expect(await response.text()).toContain('RATING_STAGE_NOT_AVAILABLE')
+    expect(await response.text()).toContain(code)
   })
 
   it('rejects client evidence and seals one candidate against a different key', async () => {
@@ -279,13 +282,17 @@ describe('T1 stage choice, expiry, and resume', () => {
     expect((await choose(session, confidence)).status).toBe(400)
   })
 
-  it.each(['T2', 'T3', 'final'])('rejects future choice stage %s', async (stage) => {
+  it.each([
+    ['T2', 409, 'SHALLOW_EVIDENCE_REQUIRED'],
+    ['T3', 409, 'DEEP_EVIDENCE_REQUIRED'],
+    ['final', 400, 'INVALID_STAGE'],
+  ])('rejects unavailable choice stage %s', async (stage, status, code) => {
     const session = await makeGameReady()
     await start(session)
     await rateAll(session)
     const response = await choose(session, 50, crypto.randomUUID(), stage)
-    expect(response.status).toBe(409)
-    expect(await response.text()).toContain('CHOICE_STAGE_NOT_AVAILABLE')
+    expect(response.status).toBe(status)
+    expect(await response.text()).toContain(code)
   })
 
   it('replays a choice without adding sequence and rejects a new key', async () => {

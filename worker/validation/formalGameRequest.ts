@@ -15,25 +15,34 @@ export type StartGameInput = {
   clientVersion: string
 }
 
-export type T1RatingInput = {
+export type FormalRatingStage = 'T1' | 'T2' | 'T3'
+
+export type FormalRatingInput = {
   eventId: string
   sessionId: string
   candidateId: FormalCandidateId
-  stage: 'T1'
-  requestedStage: string
+  stage: FormalRatingStage
   ratingValue: number
   clientSubmittedAt: string
   clientSequence: number | null
 }
 
-export type T1StageChoiceInput = {
+export type FormalStageChoiceInput = {
   eventId: string
   sessionId: string
-  stage: 'T1'
-  requestedStage: string
+  stage: FormalRatingStage
   candidateId: FormalCandidateId
   confidence: number
   clientSubmittedAt: string
+  clientSequence: number | null
+}
+
+export type EvidenceUnlockInput = {
+  eventId: string
+  sessionId: string
+  candidateId: FormalCandidateId
+  level: 'shallow' | 'deep'
+  clientAt: string
   clientSequence: number | null
 }
 
@@ -74,6 +83,13 @@ function optionalSequence(value: unknown): number | null {
   return value as number
 }
 
+function ratingStage(value: unknown): FormalRatingStage {
+  if (value !== 'T1' && value !== 'T2' && value !== 'T3') {
+    throw invalid('INVALID_STAGE', 'The rating stage is invalid.')
+  }
+  return value
+}
+
 export async function parseStartGameRequest(request: Request): Promise<StartGameInput> {
   const eventId = readIdempotencyKey(request)
   const body = await readResearchJson(request)
@@ -89,13 +105,13 @@ export async function parseStartGameRequest(request: Request): Promise<StartGame
   }
 }
 
-export async function parseT1RatingRequest(request: Request): Promise<T1RatingInput> {
+export async function parseFormalRatingRequest(request: Request): Promise<FormalRatingInput> {
   const eventId = readIdempotencyKey(request)
   const body = await readResearchJson(request)
   const baseKeys = ['sessionId', 'candidateId', 'stage', 'ratingValue', 'clientSubmittedAt']
   const keys = 'clientSequence' in body ? [...baseKeys, 'clientSequence'] : baseKeys
   exactKeys(body, keys)
-  if (typeof body.stage !== 'string') throw invalid('INVALID_STAGE', 'A valid stage is required.')
+  const stage = ratingStage(body.stage)
   if (!Number.isInteger(body.ratingValue) || (body.ratingValue as number) < 0 || (body.ratingValue as number) > 100) {
     throw invalid('INVALID_RATING', 'The rating must be an integer from 0 to 100.')
   }
@@ -103,32 +119,54 @@ export async function parseT1RatingRequest(request: Request): Promise<T1RatingIn
     eventId,
     sessionId: requireUuid(body.sessionId),
     candidateId: candidate(body.candidateId),
-    stage: 'T1',
-    requestedStage: body.stage,
+    stage,
     ratingValue: body.ratingValue as number,
     clientSubmittedAt: iso(body.clientSubmittedAt),
     clientSequence: optionalSequence(body.clientSequence),
   }
 }
 
-export async function parseT1StageChoiceRequest(request: Request): Promise<T1StageChoiceInput> {
+export async function parseFormalStageChoiceRequest(request: Request): Promise<FormalStageChoiceInput> {
   const eventId = readIdempotencyKey(request)
   const body = await readResearchJson(request)
   const baseKeys = ['sessionId', 'stage', 'candidateId', 'confidence', 'clientSubmittedAt']
   const keys = 'clientSequence' in body ? [...baseKeys, 'clientSequence'] : baseKeys
   exactKeys(body, keys)
-  if (typeof body.stage !== 'string') throw invalid('INVALID_STAGE', 'A valid stage is required.')
+  const stage = ratingStage(body.stage)
   if (!Number.isInteger(body.confidence) || (body.confidence as number) < 0 || (body.confidence as number) > 100) {
     throw invalid('INVALID_CONFIDENCE', 'Confidence must be an integer from 0 to 100.')
   }
   return {
     eventId,
     sessionId: requireUuid(body.sessionId),
-    stage: 'T1',
-    requestedStage: body.stage,
+    stage,
     candidateId: candidate(body.candidateId),
     confidence: body.confidence as number,
     clientSubmittedAt: iso(body.clientSubmittedAt),
     clientSequence: optionalSequence(body.clientSequence),
   }
 }
+
+export async function parseEvidenceUnlockRequest(request: Request): Promise<EvidenceUnlockInput> {
+  const eventId = readIdempotencyKey(request)
+  const body = await readResearchJson(request)
+  const baseKeys = ['sessionId', 'candidateId', 'level', 'clientAt']
+  const keys = 'clientSequence' in body ? [...baseKeys, 'clientSequence'] : baseKeys
+  exactKeys(body, keys)
+  if (body.level !== 'shallow' && body.level !== 'deep') {
+    throw invalid('INVALID_EVIDENCE_LEVEL', 'The evidence level is invalid.')
+  }
+  return {
+    eventId,
+    sessionId: requireUuid(body.sessionId),
+    candidateId: candidate(body.candidateId),
+    level: body.level,
+    clientAt: iso(body.clientAt),
+    clientSequence: optionalSequence(body.clientSequence),
+  }
+}
+
+export const parseT1RatingRequest = parseFormalRatingRequest
+export const parseT1StageChoiceRequest = parseFormalStageChoiceRequest
+export type T1RatingInput = FormalRatingInput
+export type T1StageChoiceInput = FormalStageChoiceInput

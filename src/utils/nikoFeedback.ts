@@ -26,13 +26,15 @@ export const getNikoMood = (
 const stableVariant = (evidenceId: string) =>
   [...evidenceId].reduce((total, character) => total + character.charCodeAt(0), 0) % 2
 
-const evidenceFocus = (evidence: Evidence) => {
+type FeedbackEvidence = Pick<Evidence, 'id' | 'title' | 'content' | 'polarity'>
+
+const evidenceFocus = (evidence: FeedbackEvidence) => {
   const firstSentence = evidence.content.split(/[。！？]/)[0]?.trim()
   return firstSentence ? `${firstSentence}。` : evidence.content
 }
 
 const buildFeedbackText = (
-  evidence: Evidence,
+  evidence: FeedbackEvidence,
   mood: NikoMood,
 ): string => {
   const focus = evidenceFocus(evidence)
@@ -69,6 +71,35 @@ type CreateNikoFeedbackInput = {
   timestamp: number
 }
 
+export const createNikoFeedbackFromEvidence = ({
+  candidateId,
+  stage,
+  baseline,
+  value,
+  evidence,
+  timestamp,
+}: {
+  candidateId: string
+  stage: 'T2' | 'T3'
+  baseline: number
+  value: number
+  evidence: FeedbackEvidence
+  timestamp: number
+}): NikoMessage | null => {
+  const direction = getRatingDirection(value, baseline)
+  if (!direction) return null
+  const mood = getNikoMood(evidence.polarity, direction)
+  return {
+    id: `niko-${candidateId}-${stage}-${evidence.id}`,
+    candidateId,
+    stage,
+    mood,
+    text: buildFeedbackText(evidence, mood),
+    relatedEvidenceId: evidence.id,
+    timestamp,
+  }
+}
+
 export const createNikoFeedback = ({
   candidate,
   runtime,
@@ -82,23 +113,17 @@ export const createNikoFeedback = ({
       : runtime.ratings.T2 ?? runtime.ratings.T1
   if (!baselineRecord) return null
 
-  const direction = getRatingDirection(value, baselineRecord.value)
-  if (!direction) return null
-
   const evidence =
     stage === 'T2'
       ? candidate.shallowEvidence[0]
       : candidate.deepEvidence[0]
   if (!evidence) return null
-  const mood = getNikoMood(evidence.polarity, direction)
-
-  return {
-    id: `niko-${candidate.id}-${stage}-${evidence.id}`,
+  return createNikoFeedbackFromEvidence({
     candidateId: candidate.id,
     stage,
-    mood,
-    text: buildFeedbackText(evidence, mood),
-    relatedEvidenceId: evidence.id,
+    baseline: baselineRecord.value,
+    value,
+    evidence,
     timestamp,
-  }
+  })
 }

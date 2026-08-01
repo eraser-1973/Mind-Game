@@ -3,6 +3,7 @@ import { candidateById } from '../data/candidates'
 import type { CandidateRuntimeState } from '../types/game'
 import {
   createNikoFeedback,
+  createNikoFeedbackFromEvidence,
   getNikoMood,
   getRatingDirection,
 } from './nikoFeedback'
@@ -83,5 +84,20 @@ describe('Niko feedback', () => {
     })
 
     expect(message).toBeNull()
+  })
+
+  it('builds formal T3 feedback only from API-returned public evidence', () => {
+    const message = createNikoFeedbackFromEvidence({
+      candidateId: 'C', stage: 'T3', baseline: 75, value: 50, timestamp: 80,
+      evidence: {
+        id: 'C-t3-1', title: '实习任务与数据分析核验',
+        content: '周报显示其主要负责会议纪要。', polarity: 'negative',
+      },
+    })
+    expect(message).toMatchObject({
+      candidateId: 'C', stage: 'T3', mood: 'happy', relatedEvidenceId: 'C-t3-1',
+    })
+    expect(message?.text).toContain('实习任务与数据分析核验')
+    expect(JSON.stringify(message)).not.toMatch(/isKeyRisk|containsKeyRisk|trueAbility/)
   })
 })

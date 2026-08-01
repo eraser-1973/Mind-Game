@@ -1,6 +1,15 @@
 import type {
+  FormalEvidenceItem,
+  FormalEvidenceUnlock,
   FormalGameSnapshot,
+  FormalGameStage,
   FormalGameStartResponse,
+  FormalRating,
+  FormalRatingResponse,
+  FormalRatingStage,
+  FormalStageChoice,
+  FormalStageChoiceResponse,
+  FormalStageStatus,
   FormalT1RatingResponse,
   FormalT1StageChoiceResponse,
 } from '../types/formalGame'
@@ -8,7 +17,7 @@ import type { PublicCandidateId } from '../types/game'
 import { isCandidateDisplayOrder } from '../utils/formalSessionContext'
 import { FormalResearchApiError, type FetchLike } from './formalResearch'
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
@@ -20,72 +29,133 @@ function isCandidate(value: unknown): value is PublicCandidateId {
   return ['A', 'B', 'C', 'D', 'E'].includes(String(value))
 }
 
-function parseRating(value: unknown): FormalT1RatingResponse | null {
-  if (!isRecord(value)) return null
-  if (
-    typeof value.created !== 'boolean' ||
-    typeof value.sessionId !== 'string' ||
-    !isCandidate(value.candidateId) ||
-    value.stage !== 'T1' ||
-    !Number.isInteger(value.ratingValue) ||
-    (value.ratingValue as number) < 0 ||
-    (value.ratingValue as number) > 100 ||
-    value.sealed !== true ||
-    !Number.isInteger(value.sequenceNo) ||
-    !isIso(value.serverSubmittedAt) ||
-    !Number.isInteger(value.ratedCandidateCount) ||
-    value.requiredCandidateCount !== 5 ||
-    typeof value.allT1Rated !== 'boolean'
-  ) return null
-  return value as FormalT1RatingResponse
+function isRatingStage(value: unknown): value is FormalRatingStage {
+  return value === 'T1' || value === 'T2' || value === 'T3'
 }
 
-function parseChoice(value: unknown): FormalT1StageChoiceResponse | null {
+function isGameStage(value: unknown): value is FormalGameStage {
+  return value === 'T1' || value === 'T1_COMPLETE' || value === 'T2' || value === 'T3'
+}
+
+function isStageStatus(value: unknown): value is FormalStageStatus {
+  return [
+    'T1_ACTIVE', 'T1_COMPLETE', 'T2_ACTIVE', 'T2_COMPLETE',
+    'T3_ACTIVE', 'T3_COMPLETE',
+  ].includes(String(value))
+}
+
+function isScore(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+export function parseFormalRating(value: unknown): FormalRating | null {
   if (!isRecord(value)) return null
   if (
-    typeof value.created !== 'boolean' ||
-    typeof value.sessionId !== 'string' ||
-    value.stage !== 'T1' ||
-    value.currentStage !== 'T1_COMPLETE' ||
     !isCandidate(value.candidateId) ||
-    !Number.isInteger(value.confidence) ||
-    (value.confidence as number) < 0 ||
-    (value.confidence as number) > 100 ||
+    !isRatingStage(value.stage) ||
+    !isScore(value.ratingValue) ||
+    !isStringArray(value.evidenceIdsSeen) ||
     value.sealed !== true ||
     !Number.isInteger(value.sequenceNo) ||
     !isIso(value.serverSubmittedAt)
   ) return null
-  return value as FormalT1StageChoiceResponse
+  return value as FormalRating
+}
+
+export function parseFormalStageChoice(value: unknown): FormalStageChoice | null {
+  if (!isRecord(value)) return null
+  if (
+    !isRatingStage(value.stage) ||
+    !isCandidate(value.candidateId) ||
+    !isScore(value.confidence) ||
+    value.sealed !== true ||
+    !Number.isInteger(value.sequenceNo) ||
+    !isIso(value.serverSubmittedAt)
+  ) return null
+  return value as FormalStageChoice
+}
+
+function parseEvidenceItem(value: unknown): FormalEvidenceItem | null {
+  if (!isRecord(value)) return null
+  if (
+    typeof value.id !== 'string' || !value.id ||
+    typeof value.title !== 'string' || !value.title ||
+    typeof value.content !== 'string' || !value.content ||
+    (value.polarity !== 'positive' && value.polarity !== 'negative') ||
+    !Number.isInteger(value.order) || (value.order as number) < 1 ||
+    Object.keys(value).some((key) => !['id', 'title', 'content', 'polarity', 'order'].includes(key))
+  ) return null
+  return value as FormalEvidenceItem
+}
+
+export function parseFormalEvidenceUnlock(value: unknown): FormalEvidenceUnlock | null {
+  if (!isRecord(value) || !isRecord(value.points) || !Array.isArray(value.evidence)) return null
+  if (
+    !isCandidate(value.candidateId) ||
+    (value.level !== 'shallow' && value.level !== 'deep') ||
+    value.ratingStage !== (value.level === 'shallow' ? 'T2' : 'T3') ||
+    !Number.isInteger(value.sequenceNo) || !isIso(value.serverAt) ||
+    !Number.isInteger(value.points.before) || !Number.isInteger(value.points.cost) ||
+    !Number.isInteger(value.points.after) ||
+    (value.points.before as number) < 0 || (value.points.cost as number) <= 0 ||
+    (value.points.after as number) < 0 ||
+    value.points.after !== (value.points.before as number) - (value.points.cost as number) ||
+    !value.evidence.every((item) => Boolean(parseEvidenceItem(item)))
+  ) return null
+  return value as unknown as FormalEvidenceUnlock
+}
+
+function parseRatingResponse(value: unknown): FormalRatingResponse | null {
+  const rating = parseFormalRating(value)
+  if (!rating || !isRecord(value)) return null
+  if (
+    typeof value.created !== 'boolean' || typeof value.sessionId !== 'string' ||
+    !Number.isInteger(value.ratedCandidateCount) ||
+    !Number.isInteger(value.requiredCandidateCount) ||
+    typeof value.allStageRated !== 'boolean' || typeof value.allT1Rated !== 'boolean'
+  ) return null
+  return value as FormalRatingResponse
+}
+
+function parseChoiceResponse(value: unknown): FormalStageChoiceResponse | null {
+  const choice = parseFormalStageChoice(value)
+  if (!choice || !isRecord(value)) return null
+  if (
+    typeof value.created !== 'boolean' || typeof value.sessionId !== 'string' ||
+    !isGameStage(value.currentStage) || !isStageStatus(value.stageStatus)
+  ) return null
+  return value as FormalStageChoiceResponse
 }
 
 function parseSnapshotFields(value: Record<string, unknown>): boolean {
-  if (!isRecord(value.points) || !Array.isArray(value.ratings)) return false
+  if (
+    !isRecord(value.points) || !Array.isArray(value.ratings) ||
+    !Array.isArray(value.stageChoices) || !Array.isArray(value.evidenceUnlocks)
+  ) return false
   return (
     value.durationSec === 900 &&
-    isIso(value.startedAt) &&
-    isIso(value.deadlineAt) &&
-    isIso(value.serverNow) &&
-    Number.isInteger(value.remainingSec) &&
-    (value.remainingSec as number) >= 0 &&
+    isIso(value.startedAt) && isIso(value.deadlineAt) && isIso(value.serverNow) &&
+    Number.isInteger(value.remainingSec) && (value.remainingSec as number) >= 0 &&
     typeof value.expired === 'boolean' &&
-    (value.currentStage === 'T1' || value.currentStage === 'T1_COMPLETE') &&
-    value.points.total === 5 && value.points.remaining === 5 &&
-    value.ratings.every((rating) => parseRating({
-      ...(rating as object), created: true, sessionId: 'projection',
-      ratedCandidateCount: 1, requiredCandidateCount: 5, allT1Rated: false,
-    })) &&
-    (value.stageChoice === null || Boolean(parseChoice({
-      ...(value.stageChoice as object), created: true, sessionId: 'projection',
-      currentStage: 'T1_COMPLETE',
-    })))
+    isGameStage(value.currentStage) && isStageStatus(value.stageStatus) &&
+    Number.isInteger(value.points.total) && (value.points.total as number) > 0 &&
+    Number.isInteger(value.points.remaining) && (value.points.remaining as number) >= 0 &&
+    (value.points.remaining as number) <= (value.points.total as number) &&
+    value.ratings.every((rating) => Boolean(parseFormalRating(rating))) &&
+    value.stageChoices.every((choice) => Boolean(parseFormalStageChoice(choice))) &&
+    (value.stageChoice === null || Boolean(parseFormalStageChoice(value.stageChoice))) &&
+    value.evidenceUnlocks.every((unlock) => Boolean(parseFormalEvidenceUnlock(unlock)))
   )
 }
 
 function parseStart(value: unknown): FormalGameStartResponse | null {
   if (!isRecord(value) || !parseSnapshotFields(value)) return null
   if (
-    typeof value.created !== 'boolean' ||
-    typeof value.sessionId !== 'string' ||
+    typeof value.created !== 'boolean' || typeof value.sessionId !== 'string' ||
     value.currentStep !== 'playing' ||
     !isCandidateDisplayOrder(value.candidateDisplayOrder) ||
     value.initialOpenedCandidate !== value.candidateDisplayOrder[0]
@@ -99,7 +169,7 @@ export function parseFormalGameSnapshot(value: unknown): FormalGameSnapshot | nu
   return value as FormalGameSnapshot
 }
 
-async function request<T>(
+export async function requestFormalGame<T>(
   path: string,
   body: unknown,
   idempotencyKey: string,
@@ -118,13 +188,13 @@ async function request<T>(
       body: JSON.stringify(body),
     })
   } catch {
-    throw new FormalResearchApiError(null, 'NETWORK_ERROR', '\u6682\u65f6\u65e0\u6cd5\u8fde\u63a5\u5b9e\u9a8c\u670d\u52a1\uff0c\u8bf7\u91cd\u8bd5\u3002', true)
+    throw new FormalResearchApiError(null, 'NETWORK_ERROR', '暂时无法连接实验服务，请重试。', true)
   }
   let envelope: unknown
   try {
     envelope = await response.json()
   } catch {
-    throw new FormalResearchApiError(response.status, 'INVALID_RESPONSE', '\u5b9e\u9a8c\u670d\u52a1\u54cd\u5e94\u65e0\u6cd5\u8bc6\u522b\u3002', true)
+    throw new FormalResearchApiError(response.status, 'INVALID_RESPONSE', '实验服务响应无法识别。', true)
   }
   const dataEnvelope = isRecord(envelope) ? envelope : null
   if (!response.ok) {
@@ -132,19 +202,14 @@ async function request<T>(
     throw new FormalResearchApiError(
       response.status,
       typeof error?.code === 'string' ? error.code : `HTTP_${response.status}`,
-      typeof error?.message === 'string' ? error.message : '\u5b9e\u9a8c\u670d\u52a1\u6682\u65f6\u65e0\u6cd5\u5904\u7406\u8bf7\u6c42\u3002',
+      typeof error?.message === 'string' ? error.message : '实验服务暂时无法处理请求。',
       response.status >= 500,
       typeof dataEnvelope?.requestId === 'string' ? dataEnvelope.requestId : null,
     )
   }
   const parsed = dataEnvelope?.ok === true ? parser(dataEnvelope.data) : null
   if (!parsed) {
-    throw new FormalResearchApiError(
-      response.status,
-      'INVALID_RESPONSE',
-      '\u5b9e\u9a8c\u670d\u52a1\u54cd\u5e94\u65e0\u6cd5\u8bc6\u522b\u3002',
-      true,
-    )
+    throw new FormalResearchApiError(response.status, 'INVALID_RESPONSE', '实验服务响应无法识别。', true)
   }
   return parsed
 }
@@ -154,32 +219,31 @@ export function startFormalGame(
   idempotencyKey: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<FormalGameStartResponse> {
-  return request(
+  return requestFormalGame(
     `/api/sessions/${encodeURIComponent(input.sessionId)}/start`,
-    input,
-    idempotencyKey,
-    parseStart,
-    fetchImpl,
+    input, idempotencyKey, parseStart, fetchImpl,
   )
 }
 
-export function submitFormalT1Rating(
+export function submitFormalRating(
   input: {
     sessionId: string
     candidateId: PublicCandidateId
+    stage: FormalRatingStage
     ratingValue: number
     clientSubmittedAt: string
     clientSequence?: number
   },
   idempotencyKey: string,
   fetchImpl: FetchLike = fetch,
-): Promise<FormalT1RatingResponse> {
-  return request('/api/ratings', { ...input, stage: 'T1' }, idempotencyKey, parseRating, fetchImpl)
+): Promise<FormalRatingResponse> {
+  return requestFormalGame('/api/ratings', input, idempotencyKey, parseRatingResponse, fetchImpl)
 }
 
-export function submitFormalT1StageChoice(
+export function submitFormalStageChoice(
   input: {
     sessionId: string
+    stage: FormalRatingStage
     candidateId: PublicCandidateId
     confidence: number
     clientSubmittedAt: string
@@ -187,6 +251,22 @@ export function submitFormalT1StageChoice(
   },
   idempotencyKey: string,
   fetchImpl: FetchLike = fetch,
+): Promise<FormalStageChoiceResponse> {
+  return requestFormalGame('/api/stage-choices', input, idempotencyKey, parseChoiceResponse, fetchImpl)
+}
+
+export function submitFormalT1Rating(
+  input: Omit<Parameters<typeof submitFormalRating>[0], 'stage'>,
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalT1RatingResponse> {
+  return submitFormalRating({ ...input, stage: 'T1' }, idempotencyKey, fetchImpl) as Promise<FormalT1RatingResponse>
+}
+
+export function submitFormalT1StageChoice(
+  input: Omit<Parameters<typeof submitFormalStageChoice>[0], 'stage'>,
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
 ): Promise<FormalT1StageChoiceResponse> {
-  return request('/api/stage-choices', { ...input, stage: 'T1' }, idempotencyKey, parseChoice, fetchImpl)
+  return submitFormalStageChoice({ ...input, stage: 'T1' }, idempotencyKey, fetchImpl) as Promise<FormalT1StageChoiceResponse>
 }

@@ -22,7 +22,7 @@ import { NikoChatPanel } from './NikoChatPanel'
 import { ReportScreen } from './ReportScreen'
 import { SunkCostModal } from './SunkCostModal'
 import { TimerBar } from './TimerBar'
-import { FormalT1GameScreen } from './FormalT1GameScreen'
+import { FormalGameScreen } from './FormalGameScreen'
 
 type Props = {
   mode: GameMode
@@ -43,7 +43,7 @@ export function GameScreen({
 }: Props) {
   if (mode === 'formal' && researchData?.formalSession) {
     return (
-      <FormalT1GameScreen
+      <FormalGameScreen
         session={researchData.formalSession}
         initialSnapshot={formalGameSnapshot}
         onSnapshot={onFormalGameSnapshot}

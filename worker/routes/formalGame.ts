@@ -1,16 +1,18 @@
 import { authenticateFormalSession, SessionAuthError } from '../auth/sessionAuth'
 import type { Env } from '../env'
 import { errorResponse, successResponse } from '../http/responses'
+import { FormalGameError } from '../domain/formalGameError'
 import {
-  FormalGameError,
   saveT1Rating,
   saveT1StageChoice,
   startFormalGame,
 } from '../services/formalGame'
+import { unlockFormalEvidence } from '../services/formalEvidence'
 import {
   parseStartGameRequest,
   parseT1RatingRequest,
   parseT1StageChoiceRequest,
+  parseEvidenceUnlockRequest,
 } from '../validation/formalGameRequest'
 import { ResearchIntakeRequestError, requireUuid } from '../validation/researchIntakeRequest'
 
@@ -89,6 +91,22 @@ export async function handleT1StageChoice(
     const input = await parseT1StageChoiceRequest(request)
     const session = await authenticateFormalSession(request, env.DB, input.sessionId)
     const data = await saveT1StageChoice(env.DB, session, input)
+    return successResponse(data, requestId, data.created ? 201 : 200)
+  } catch (error) {
+    return errorResult(error, requestId)
+  }
+}
+
+export async function handleEvidenceUnlock(
+  request: Request,
+  env: Env,
+  requestId: string,
+): Promise<Response> {
+  if (request.method !== 'POST') return methodNotAllowed(requestId)
+  try {
+    const input = await parseEvidenceUnlockRequest(request)
+    const session = await authenticateFormalSession(request, env.DB, input.sessionId)
+    const data = await unlockFormalEvidence(env.DB, session, input)
     return successResponse(data, requestId, data.created ? 201 : 200)
   } catch (error) {
     return errorResult(error, requestId)

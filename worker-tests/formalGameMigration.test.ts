@@ -61,7 +61,7 @@ async function seedGameRun(db: D1Database, sessionId: string, now: string) {
 
 describe('0004 formal game and T1 migration', () => {
   it('creates the four game tables, required indexes, and schema version 4', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0004_formal_game_t1.sql' })
     runtime = created.runtime
     const tables = await created.db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
@@ -90,7 +90,7 @@ describe('0004 formal game and T1 migration', () => {
   })
 
   it('enforces T1 empty evidence, ranges, sealing, and unique sequence numbers', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0004_formal_game_t1.sql' })
     runtime = created.runtime
     const { sessionId, now } = await seedSession(created.db)
     await seedGameRun(created.db, sessionId, now)
@@ -128,7 +128,7 @@ describe('0004 formal game and T1 migration', () => {
   })
 
   it('enforces one sealed stage choice and one server sequence per session', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0004_formal_game_t1.sql' })
     runtime = created.runtime
     const { sessionId, now } = await seedSession(created.db, 'choice')
     await seedGameRun(created.db, sessionId, now)
@@ -164,7 +164,7 @@ describe('0004 formal game and T1 migration', () => {
   })
 
   it('rejects invalid point balances and cascades session deletion', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0004_formal_game_t1.sql' })
     runtime = created.runtime
     const { sessionId, participantId, now } = await seedSession(created.db, 'cascade')
     await expect(created.db.prepare(`INSERT INTO game_runs (

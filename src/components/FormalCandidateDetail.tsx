@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { FormalT1Rating } from '../types/formalGame'
+import type { ReactNode } from 'react'
+import type { FormalRating } from '../types/formalGame'
 import type { Candidate } from '../types/game'
 
 export function FormalCandidateDetail({
@@ -9,13 +10,15 @@ export function FormalCandidateDetail({
   expired,
   error,
   onSubmit,
+  children,
 }: {
   candidate: Candidate
-  rating: FormalT1Rating | undefined
-  pending: boolean
-  expired: boolean
+  rating?: FormalRating
+  pending?: boolean
+  expired?: boolean
   error?: string | null
-  onSubmit: (value: number) => void
+  onSubmit?: (value: number) => void
+  children?: ReactNode
 }) {
   const [value, setValue] = useState(50)
 
@@ -42,12 +45,13 @@ export function FormalCandidateDetail({
           {candidate.experiences.map((experience) => <article key={experience.title}><strong>{experience.title}</strong><p>{experience.content}</p></article>)}
         </div>
       </section>
-      <section className="formal-verification-lock" data-testid="formal-verification-locked">
-        <span className="eyebrow">EVIDENCE LOCKED</span>
-        <strong>{'\u67e5\u8bc1\u6750\u6599\u5c06\u5728\u4e0b\u4e00\u5f00\u53d1\u9636\u6bb5\u63a5\u5165'}</strong>
-        <p>{'\u672c\u9636\u6bb5\u4e0d\u4f1a\u5728\u672c\u5730\u6263\u51cf\u67e5\u8bc1\u70b9\u6570\uff0c\u4e5f\u4e0d\u63d0\u4ea4 T2/T3\u3002'}</p>
-      </section>
-      <section className="rating-panel" data-testid={`formal-rating-${candidate.id}`}>
+      {children ?? <>
+        <section className="formal-verification-lock" data-testid="formal-verification-locked">
+          <span className="eyebrow">EVIDENCE LOCKED</span>
+          <strong>{'完成全部 T1 初评后开放服务器查证'}</strong>
+          <p>{'正式模式不会在本地预先显示材料或扣减查证点数。'}</p>
+        </section>
+        <section className="rating-panel" data-testid={`formal-rating-${candidate.id}`}>
         <div className="section-title-row"><div><span className="eyebrow">T1</span><h3>{'\u7b80\u5386\u9996\u5c4f\u521d\u8bc4'}</h3></div></div>
         {rating ? (
           <p className="empty-state">{`T1 ${rating.ratingValue} · \u670d\u52a1\u5668\u5df2\u5c01\u5b58`}</p>
@@ -59,12 +63,13 @@ export function FormalCandidateDetail({
               <span>100</span><output>{value}</output>
             </div>
             {error && <p className="formal-game-error" role="alert">{error}</p>}
-            <button type="button" className="button button--compact" disabled={pending || expired} onClick={() => onSubmit(value)}>
+            <button type="button" className="button button--compact" disabled={pending || expired} onClick={() => onSubmit?.(value)}>
               {pending ? '\u6b63\u5728\u4fdd\u5b58\u2026' : '\u63d0\u4ea4\u5e76\u5c01\u5b58 T1'}
             </button>
           </>
         )}
-      </section>
+        </section>
+      </>}
     </article>
   )
 }

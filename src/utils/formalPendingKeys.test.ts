@@ -23,7 +23,13 @@ describe('formal game pending UUID keys', () => {
   it.each([
     ['game-start', 'mind-game.pending.game-start.v1'],
     ['rating:T1:A', 'mind-game.pending.rating.T1.A.v1'],
+    ['rating:T2:B', 'mind-game.pending.rating.T2.B.v1'],
+    ['rating:T3:C', 'mind-game.pending.rating.T3.C.v1'],
     ['stage-choice:T1', 'mind-game.pending.stage-choice.T1.v1'],
+    ['stage-choice:T2', 'mind-game.pending.stage-choice.T2.v1'],
+    ['stage-choice:T3', 'mind-game.pending.stage-choice.T3.v1'],
+    ['evidence:shallow:D', 'mind-game.pending.evidence.shallow.D.v1'],
+    ['evidence:deep:E', 'mind-game.pending.evidence.deep.E.v1'],
   ] as const)('uses isolated key %s', (operation, expected) => {
     expect(pendingFormalGameStorageKey(operation)).toBe(expected)
   })
@@ -42,6 +48,8 @@ describe('formal game pending UUID keys', () => {
     storage.setItem('unrelated', 'keep')
     getOrCreateFormalGamePendingKey('game-start', storage)
     getOrCreateFormalGamePendingKey('stage-choice:T1', storage)
+    getOrCreateFormalGamePendingKey('rating:T2:A', storage)
+    getOrCreateFormalGamePendingKey('evidence:deep:A', storage)
     clearAllFormalGamePendingKeys(storage)
     expect(storage.getItem('unrelated')).toBe('keep')
     expect(storage.length).toBe(1)

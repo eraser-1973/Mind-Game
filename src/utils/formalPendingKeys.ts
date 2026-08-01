@@ -1,15 +1,17 @@
 type FormalGamePendingOperation =
   | 'game-start'
-  | `rating:T1:${'A' | 'B' | 'C' | 'D' | 'E'}`
-  | 'stage-choice:T1'
+  | `rating:${'T1' | 'T2' | 'T3'}:${'A' | 'B' | 'C' | 'D' | 'E'}`
+  | `stage-choice:${'T1' | 'T2' | 'T3'}`
+  | `evidence:${'shallow' | 'deep'}:${'A' | 'B' | 'C' | 'D' | 'E'}`
 
 const PREFIX = 'mind-game.pending.'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function pendingFormalGameStorageKey(operation: FormalGamePendingOperation): string {
   if (operation === 'game-start') return `${PREFIX}game-start.v1`
-  if (operation === 'stage-choice:T1') return `${PREFIX}stage-choice.T1.v1`
-  return `${PREFIX}rating.T1.${operation.slice(-1)}.v1`
+  const [kind, stageOrLevel, candidateId] = operation.split(':')
+  if (kind === 'stage-choice') return `${PREFIX}stage-choice.${stageOrLevel}.v1`
+  return `${PREFIX}${kind}.${stageOrLevel}.${candidateId}.v1`
 }
 
 function defaultStorage(): Storage {
@@ -43,8 +45,9 @@ export function clearAllFormalGamePendingKeys(
     const key = storage.key(index)
     if (key?.startsWith(PREFIX) && (
       key === `${PREFIX}game-start.v1` ||
-      key === `${PREFIX}stage-choice.T1.v1` ||
-      /^mind-game\.pending\.rating\.T1\.[A-E]\.v1$/.test(key)
+      /^mind-game\.pending\.stage-choice\.T[123]\.v1$/.test(key) ||
+      /^mind-game\.pending\.rating\.T[123]\.[A-E]\.v1$/.test(key) ||
+      /^mind-game\.pending\.evidence\.(shallow|deep)\.[A-E]\.v1$/.test(key)
     )) keys.push(key)
   }
   keys.forEach((key) => storage.removeItem(key))

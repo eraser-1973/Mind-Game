@@ -14,12 +14,13 @@ vi.mock('../api/formalGame', async () => {
   return {
     ...actual,
     startFormalGame: api.start,
-    submitFormalT1Rating: api.rate,
-    submitFormalT1StageChoice: api.choose,
+    submitFormalRating: api.rate,
+    submitFormalStageChoice: api.choose,
   }
 })
 
 import { FormalCandidateDetail } from './FormalCandidateDetail'
+import { FormalEvidencePanel } from './FormalEvidencePanel'
 import { FormalT1CompletePanel } from './FormalT1CompletePanel'
 import { FormalT1GameScreen } from './FormalT1GameScreen'
 import { StageChoicePanel } from './StageChoicePanel'
@@ -51,8 +52,8 @@ const baseSnapshot: FormalGameSnapshot = {
   started: true, resumeSupported: true, durationSec: 900,
   startedAt: '2026-08-01T00:00:00.000Z', deadlineAt: '2099-08-01T00:15:00.000Z',
   serverNow: '2026-08-01T00:00:00.000Z', remainingSec: 900, expired: false,
-  currentStage: 'T1', points: { total: 5, remaining: 5 },
-  ratings: [], stageChoice: null, lastSequenceNo: 1,
+  currentStage: 'T1', stageStatus: 'T1_ACTIVE', points: { total: 5, remaining: 5 },
+  ratings: [], stageChoice: null, stageChoices: [], evidenceUnlocks: [], lastSequenceNo: 1,
 }
 
 let renderer: ReactTestRenderer | undefined
@@ -91,9 +92,9 @@ describe('FormalT1GameScreen server state behavior', () => {
   it('seals a rating only after server success', async () => {
     api.rate.mockResolvedValue({
       created: true, sessionId: context.sessionId, candidateId: 'B', stage: 'T1',
-      ratingValue: 73, sealed: true, sequenceNo: 2,
+      ratingValue: 73, evidenceIdsSeen: [], sealed: true, sequenceNo: 2,
       serverSubmittedAt: '2026-08-01T00:01:00.000Z', ratedCandidateCount: 1,
-      requiredCandidateCount: 5, allT1Rated: false,
+      requiredCandidateCount: 5, allStageRated: false, allT1Rated: false,
     })
     renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
     await act(async () => renderer!.root.findByType(FormalCandidateDetail).props.onSubmit(73))
@@ -104,9 +105,9 @@ describe('FormalT1GameScreen server state behavior', () => {
   it('retains an unsealed control and reuses the same UUID after a network failure', async () => {
     api.rate.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
       created: true, sessionId: context.sessionId, candidateId: 'B', stage: 'T1',
-      ratingValue: 60, sealed: true, sequenceNo: 2,
+      ratingValue: 60, evidenceIdsSeen: [], sealed: true, sequenceNo: 2,
       serverSubmittedAt: '2026-08-01T00:01:00.000Z', ratedCandidateCount: 1,
-      requiredCandidateCount: 5, allT1Rated: false,
+      requiredCandidateCount: 5, allStageRated: false, allT1Rated: false,
     })
     renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
     await act(async () => renderer!.root.findByType(FormalCandidateDetail).props.onSubmit(60))
@@ -118,21 +119,22 @@ describe('FormalT1GameScreen server state behavior', () => {
     expect(JSON.stringify(stored)).not.toContain('60')
   })
 
-  it('shows stage choice only after five server ratings and pauses after choice success', async () => {
+  it('shows stage choice only after five server ratings and opens server verification after choice success', async () => {
     const ratings = context.candidateDisplayOrder.map((candidateId, index) => ({
       candidateId, stage: 'T1' as const, ratingValue: index * 20,
-      sealed: true as const, sequenceNo: index + 2,
+      evidenceIdsSeen: [], sealed: true as const, sequenceNo: index + 2,
       serverSubmittedAt: '2026-08-01T00:01:00.000Z',
     }))
     api.choose.mockResolvedValue({
       created: true, sessionId: context.sessionId, stage: 'T1', candidateId: 'D',
-      confidence: 0, sealed: true, currentStage: 'T1_COMPLETE', sequenceNo: 7,
+      confidence: 0, sealed: true, currentStage: 'T1_COMPLETE', stageStatus: 'T1_COMPLETE', sequenceNo: 7,
       serverSubmittedAt: '2026-08-01T00:05:00.000Z',
     })
     renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, ratings, lastSequenceNo: 6 }} onExit={vi.fn()} />)
     expect(renderer.root.findAllByType(StageChoicePanel)).toHaveLength(1)
     await act(async () => renderer!.root.findByType(StageChoicePanel).props.onSubmit('D', 0))
-    expect(renderer.root.findAllByType(FormalT1CompletePanel)).toHaveLength(1)
+    expect(renderer.root.findAllByType(FormalEvidencePanel)).toHaveLength(1)
+    expect(renderer.root.findAllByType(FormalT1CompletePanel)).toHaveLength(0)
   })
 
   it('locks all submissions on an expired server snapshot', () => {

@@ -5,6 +5,7 @@ import {
   handleStartFormalGame,
   handleT1Rating,
   handleT1StageChoice,
+  handleEvidenceUnlock,
 } from './routes/formalGame'
 import { handleSessions } from './routes/sessions'
 import {
@@ -49,6 +50,10 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
 
   if (url.pathname === '/api/stage-choices') {
     return handleT1StageChoice(request, env, requestId)
+  }
+
+  if (url.pathname === '/api/evidence/unlock') {
+    return handleEvidenceUnlock(request, env, requestId)
   }
 
   const startMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/start$/)

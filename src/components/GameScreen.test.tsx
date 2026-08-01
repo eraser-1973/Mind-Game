@@ -115,8 +115,8 @@ vi.mock('./TimerBar', () => ({
   TimerBar: () => <div>TimerBar</div>,
 }))
 
-vi.mock('./FormalT1GameScreen', () => ({
-  FormalT1GameScreen: () => <div>FormalT1GameScreen</div>,
+vi.mock('./FormalGameScreen', () => ({
+  FormalGameScreen: () => <div>FormalGameScreen</div>,
 }))
 
 import { GameScreen } from './GameScreen'
@@ -163,7 +163,7 @@ describe('GameScreen current task copy', () => {
       <GameScreen mode="quick" onRestart={() => undefined} />,
     )
 
-    expect(formal).toContain('FormalT1GameScreen')
+    expect(formal).toContain('FormalGameScreen')
     expect(formal).not.toContain('NikoChatPanel')
     expect(quick).toContain('HRChatPanel')
     expect(quick).not.toContain('NikoChatPanel')

@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { unlockFormalEvidence } from '../api/formalEvidence'
 import {
   startFormalGame,
-  submitFormalT1Rating,
-  submitFormalT1StageChoice,
+  submitFormalRating,
+  submitFormalStageChoice,
 } from '../api/formalGame'
-import type { FormalGameSnapshot, FormalGameStartResponse } from '../types/formalGame'
+import type {
+  FormalEvidenceLevel,
+  FormalEvidenceUnlockResponse,
+  FormalGameSnapshot,
+  FormalGameStartResponse,
+  FormalRatingResponse,
+  FormalRatingStage,
+} from '../types/formalGame'
 import type { FormalSessionContext, PublicCandidateId } from '../types/game'
 import {
   clearFormalGamePendingKey,
@@ -24,11 +32,19 @@ function snapshotFromStart(result: FormalGameStartResponse): FormalGameSnapshot 
     remainingSec: result.remainingSec,
     expired: result.expired,
     currentStage: result.currentStage,
+    stageStatus: result.stageStatus,
     points: result.points,
     ratings: result.ratings,
     stageChoice: result.stageChoice,
+    stageChoices: result.stageChoices,
+    evidenceUnlocks: result.evidenceUnlocks,
   }
 }
+
+const operationErrorKey = (
+  stageOrLevel: FormalRatingStage | FormalEvidenceLevel,
+  candidateId: PublicCandidateId,
+) => `${stageOrLevel}:${candidateId}`
 
 export function useFormalGameController({
   session,
@@ -42,9 +58,10 @@ export function useFormalGameController({
   const [snapshot, setSnapshot] = useState<FormalGameSnapshot | null>(initialSnapshot ?? null)
   const [remainingSec, setRemainingSec] = useState(initialSnapshot?.remainingSec ?? 900)
   const [startError, setStartError] = useState<string | null>(null)
-  const [ratingError, setRatingError] = useState<Record<string, string | null>>({})
+  const [operationErrors, setOperationErrors] = useState<Record<string, string | null>>({})
   const [choiceError, setChoiceError] = useState<string | null>(null)
-  const [pendingRatingId, setPendingRatingId] = useState<PublicCandidateId | null>(null)
+  const [pendingRating, setPendingRating] = useState<string | null>(null)
+  const [pendingEvidence, setPendingEvidence] = useState<string | null>(null)
   const [choicePending, setChoicePending] = useState(false)
   const startAttempted = useRef(false)
   const onSnapshotRef = useRef(onSnapshot)
@@ -74,7 +91,7 @@ export function useFormalGameController({
       setSnapshot(next)
       setRemainingSec(next.remainingSec)
     } catch (error) {
-      setStartError(error instanceof Error ? error.message : '\u6682\u65f6\u65e0\u6cd5\u542f\u52a8\u6b63\u5f0f\u6d4b\u8bc4\u3002')
+      setStartError(error instanceof Error ? error.message : '暂时无法启动正式测评。')
     }
   }, [session.sessionId])
 
@@ -99,28 +116,37 @@ export function useFormalGameController({
     void start()
   }, [start])
 
-  const submitRating = useCallback(async (candidateId: PublicCandidateId, ratingValue: number) => {
-    if (!snapshot || remainingSec === 0 || snapshot.currentStage !== 'T1') return
-    setPendingRatingId(candidateId)
-    setRatingError((current) => ({ ...current, [candidateId]: null }))
-    const key = getOrCreateFormalGamePendingKey(`rating:T1:${candidateId}`)
+  const submitRating = useCallback(async (
+    candidateId: PublicCandidateId,
+    stage: FormalRatingStage,
+    ratingValue: number,
+  ): Promise<FormalRatingResponse | null> => {
+    if (!snapshot || remainingSec === 0) return null
+    const operation = operationErrorKey(stage, candidateId)
+    setPendingRating(operation)
+    setOperationErrors((current) => ({ ...current, [operation]: null }))
+    const pendingOperation = `rating:${stage}:${candidateId}` as const
+    const key = getOrCreateFormalGamePendingKey(pendingOperation)
     try {
-      const result = await submitFormalT1Rating({
+      const result = await submitFormalRating({
         sessionId: session.sessionId,
         candidateId,
+        stage,
         ratingValue,
         clientSubmittedAt: new Date().toISOString(),
-        clientSequence: snapshot.lastSequenceNo ?? snapshot.ratings.length + 1,
+        clientSequence: snapshot.lastSequenceNo ?? 1,
       }, key)
-      clearFormalGamePendingKey(`rating:T1:${candidateId}`)
+      clearFormalGamePendingKey(pendingOperation)
       setSnapshot((current) => current ? {
         ...current,
         ratings: [
-          ...current.ratings.filter((rating) => rating.candidateId !== result.candidateId),
+          ...current.ratings.filter((rating) =>
+            !(rating.candidateId === result.candidateId && rating.stage === result.stage)),
           {
             candidateId: result.candidateId,
-            stage: 'T1' as const,
+            stage: result.stage,
             ratingValue: result.ratingValue,
+            evidenceIdsSeen: result.evidenceIdsSeen,
             sealed: true as const,
             sequenceNo: result.sequenceNo,
             serverSubmittedAt: result.serverSubmittedAt,
@@ -128,45 +154,120 @@ export function useFormalGameController({
         ].sort((left, right) => left.sequenceNo - right.sequenceNo),
         lastSequenceNo: result.sequenceNo,
       } : current)
+      return result
     } catch (error) {
-      setRatingError((current) => ({
+      setOperationErrors((current) => ({
         ...current,
-        [candidateId]: error instanceof Error ? error.message : '\u8bc4\u5206\u6682\u65f6\u65e0\u6cd5\u4fdd\u5b58\uff0c\u8bf7\u91cd\u8bd5\u3002',
+        [operation]: error instanceof Error ? error.message : '评分暂时无法保存，请重试。',
       }))
+      return null
     } finally {
-      setPendingRatingId(null)
+      setPendingRating(null)
     }
   }, [remainingSec, session.sessionId, snapshot])
 
-  const submitChoice = useCallback(async (candidateId: PublicCandidateId, confidence: number) => {
-    if (!snapshot || remainingSec === 0 || snapshot.ratings.length !== 5) return
+  const submitChoice = useCallback(async (
+    stage: FormalRatingStage,
+    candidateId: PublicCandidateId,
+    confidence: number,
+  ) => {
+    if (!snapshot || remainingSec === 0) return null
     setChoicePending(true)
     setChoiceError(null)
-    const key = getOrCreateFormalGamePendingKey('stage-choice:T1')
+    const pendingOperation = `stage-choice:${stage}` as const
+    const key = getOrCreateFormalGamePendingKey(pendingOperation)
     try {
-      const result = await submitFormalT1StageChoice({
+      const result = await submitFormalStageChoice({
         sessionId: session.sessionId,
+        stage,
         candidateId,
         confidence,
         clientSubmittedAt: new Date().toISOString(),
-        clientSequence: snapshot.lastSequenceNo ?? 6,
+        clientSequence: snapshot.lastSequenceNo ?? 1,
       }, key)
-      clearFormalGamePendingKey('stage-choice:T1')
+      clearFormalGamePendingKey(pendingOperation)
       setSnapshot((current) => current ? {
         ...current,
-        currentStage: 'T1_COMPLETE',
-        stageChoice: {
+        currentStage: result.currentStage,
+        stageStatus: result.stageStatus,
+        stageChoice: result.stage === 'T1' ? {
           stage: 'T1', candidateId: result.candidateId,
-          confidence: result.confidence, sealed: true,
+          confidence: result.confidence, sealed: true as const,
           sequenceNo: result.sequenceNo,
           serverSubmittedAt: result.serverSubmittedAt,
-        },
+        } : current.stageChoice,
+        stageChoices: [
+          ...current.stageChoices.filter((choice) => choice.stage !== result.stage),
+          {
+            stage: result.stage, candidateId: result.candidateId,
+            confidence: result.confidence, sealed: true as const,
+            sequenceNo: result.sequenceNo,
+            serverSubmittedAt: result.serverSubmittedAt,
+          },
+        ].sort((left, right) => left.sequenceNo - right.sequenceNo),
         lastSequenceNo: result.sequenceNo,
       } : current)
+      return result
     } catch (error) {
-      setChoiceError(error instanceof Error ? error.message : '\u9636\u6bb5\u5224\u65ad\u6682\u65f6\u65e0\u6cd5\u4fdd\u5b58\uff0c\u8bf7\u91cd\u8bd5\u3002')
+      setChoiceError(error instanceof Error ? error.message : '阶段判断暂时无法保存，请重试。')
+      return null
     } finally {
       setChoicePending(false)
+    }
+  }, [remainingSec, session.sessionId, snapshot])
+
+  const unlockEvidence = useCallback(async (
+    candidateId: PublicCandidateId,
+    level: FormalEvidenceLevel,
+  ): Promise<FormalEvidenceUnlockResponse | null> => {
+    if (!snapshot || remainingSec === 0) return null
+    const operation = operationErrorKey(level, candidateId)
+    setPendingEvidence(operation)
+    setOperationErrors((current) => ({ ...current, [operation]: null }))
+    const pendingOperation = `evidence:${level}:${candidateId}` as const
+    const key = getOrCreateFormalGamePendingKey(pendingOperation)
+    try {
+      const result = await unlockFormalEvidence({
+        sessionId: session.sessionId,
+        candidateId,
+        level,
+        clientAt: new Date().toISOString(),
+        clientSequence: snapshot.lastSequenceNo ?? 1,
+      }, key)
+      clearFormalGamePendingKey(pendingOperation)
+      setSnapshot((current) => current ? {
+        ...current,
+        currentStage: result.currentStage,
+        stageStatus: result.stageStatus,
+        points: { total: result.points.total, remaining: result.points.after },
+        evidenceUnlocks: [
+          ...current.evidenceUnlocks.filter((unlock) =>
+            !(unlock.candidateId === result.candidateId && unlock.level === result.level)),
+          {
+            candidateId: result.candidateId,
+            level: result.level,
+            ratingStage: result.ratingStage,
+            sequenceNo: result.sequenceNo,
+            serverAt: result.serverAt,
+            points: {
+              before: result.points.before,
+              cost: result.points.cost,
+              after: result.points.after,
+            },
+            evidence: result.evidence,
+          },
+        ].sort((left, right) => left.sequenceNo - right.sequenceNo),
+        lastSequenceNo: Math.max(current.lastSequenceNo ?? 0, result.sequenceNo),
+      } : current)
+      return result
+    } catch (error) {
+      setOperationErrors((current) => ({
+        ...current,
+        [operation]: error instanceof Error ? error.message : '查证暂时无法完成，请重试。',
+      }))
+      return null
+    } finally {
+      setPendingEvidence(null)
     }
   }, [remainingSec, session.sessionId, snapshot])
 
@@ -175,12 +276,14 @@ export function useFormalGameController({
     remainingSec,
     expired: snapshot?.expired === true || remainingSec === 0,
     startError,
-    ratingError,
-    pendingRatingId,
+    operationErrors,
+    pendingRating,
+    pendingEvidence,
     choiceError,
     choicePending,
     retryStart,
     submitRating,
     submitChoice,
+    unlockEvidence,
   }
 }
