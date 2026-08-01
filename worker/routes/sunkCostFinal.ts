@@ -59,4 +59,4 @@ export const handleActiveFinalDecision = (request: Request, env: Env, requestId:
 
 export const handleTimeoutFinalDecision = (request: Request, env: Env, requestId: string) =>
   handle(request, env, requestId, parseTimeoutFinalDecisionRequest, saveTimeoutFinalDecision as never,
-    ['in_progress', 'timeout', 'completed'])
+    ['in_progress', 'timeout'])

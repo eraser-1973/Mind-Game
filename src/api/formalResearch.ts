@@ -1,12 +1,17 @@
 import type {
   DemographicData,
   FormalConsentResponse,
+  FormalCompletionResponse,
   FormalDemographicsResponse,
+  FormalPostTaskResponse,
   FormalPreTaskResponse,
   FormalResumeData,
+  FormalTaskExperienceResponse,
   StateAssessmentData,
   StateAssessmentId,
+  TaskExperienceData,
 } from '../types/game'
+import { taskExperienceGroups } from '../data/researchFlow'
 import { isFormalSessionContext } from '../utils/formalSessionContext'
 
 export type FetchLike = (
@@ -146,6 +151,47 @@ function parsePreTask(value: unknown): FormalPreTaskResponse | null {
   return value as FormalPreTaskResponse
 }
 
+function parsePostTask(value: unknown): FormalPostTaskResponse | null {
+  if (!isRecord(value)) return null
+  if (
+    typeof value.created !== 'boolean' ||
+    typeof value.sessionId !== 'string' ||
+    value.currentStep !== 'task_experience' ||
+    typeof value.submissionId !== 'string' ||
+    value.itemCount !== 5 ||
+    !Number.isInteger(value.sequenceNo) || (value.sequenceNo as number) < 1
+  ) return null
+  return value as FormalPostTaskResponse
+}
+
+function parseTaskExperience(value: unknown): FormalTaskExperienceResponse | null {
+  if (!isRecord(value)) return null
+  if (
+    typeof value.created !== 'boolean' ||
+    typeof value.sessionId !== 'string' ||
+    value.currentStep !== 'completion_pending' ||
+    typeof value.submissionId !== 'string' ||
+    value.itemCount !== 15 ||
+    !Number.isInteger(value.sequenceNo) || (value.sequenceNo as number) < 1
+  ) return null
+  return value as FormalTaskExperienceResponse
+}
+
+function parseCompletion(value: unknown): FormalCompletionResponse | null {
+  if (!isRecord(value)) return null
+  if (
+    typeof value.created !== 'boolean' ||
+    typeof value.alreadyCompleted !== 'boolean' ||
+    typeof value.sessionId !== 'string' ||
+    value.currentStep !== 'completed' ||
+    !['completed', 'timeout'].includes(String(value.completionStatus)) ||
+    !['active', 'timeout'].includes(String(value.finalSubmitMode)) ||
+    !isIso(value.serverCompletedAt) ||
+    !Number.isInteger(value.sequenceNo) || (value.sequenceNo as number) < 1
+  ) return null
+  return value as FormalCompletionResponse
+}
+
 const itemIds: StateAssessmentId[] = [
   'stress', 'fatigue', 'attention', 'mood', 'physicalDiscomfort',
 ]
@@ -173,7 +219,11 @@ function parseResume(value: unknown): FormalResumeData | null {
     Array.isArray(value.game.ratings) &&
     (value.game.stageChoice === null || isRecord(value.game.stageChoice))
   if (!preGame && !playing) return null
-  if (value.session.currentStep === 'post_task' && !isRecord(value.finalDecision)) return null
+  const postGameSteps = ['post_task', 'task_experience', 'completion_pending', 'completed']
+  if (postGameSteps.includes(String(value.session.currentStep))) {
+    if (!isRecord(value.finalDecision) || !isRecord(value.postTask) ||
+      !isRecord(value.taskExperience) || !isRecord(value.completion)) return null
+  }
   return value as FormalResumeData
 }
 
@@ -222,6 +272,79 @@ export function saveFormalPreTaskQuestionnaire(
     })),
   }
   return requestApi('/api/questionnaires', postInit(body, idempotencyKey), parsePreTask, fetchImpl)
+}
+
+export function saveFormalPostTaskQuestionnaire(
+  input: {
+    sessionId: string
+    values: StateAssessmentData
+    clientSubmittedAt: string
+  },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalPostTaskResponse> {
+  const body = {
+    sessionId: input.sessionId,
+    phase: 'post',
+    instrumentVersion: 'state-assessment-post-1.0.0',
+    clientSubmittedAt: input.clientSubmittedAt,
+    answers: itemIds.map((itemId) => ({
+      itemId,
+      value: input.values[itemId],
+      touched: true,
+      answeredAt: input.clientSubmittedAt,
+    })),
+  }
+  return requestApi('/api/questionnaires', postInit(body, idempotencyKey), parsePostTask, fetchImpl)
+}
+
+const taskExperienceItemIds = taskExperienceGroups.flatMap((group) =>
+  group.items.map((item) => item.id))
+
+export function saveFormalTaskExperienceQuestionnaire(
+  input: {
+    sessionId: string
+    values: TaskExperienceData
+    clientSubmittedAt: string
+  },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalTaskExperienceResponse> {
+  const body = {
+    sessionId: input.sessionId,
+    phase: 'task_experience',
+    instrumentVersion: 'task-experience-1.0.0',
+    clientSubmittedAt: input.clientSubmittedAt,
+    answers: taskExperienceItemIds.map((itemId) => ({
+      itemId,
+      value: input.values[itemId],
+      touched: true,
+      answeredAt: input.clientSubmittedAt,
+    })),
+  }
+  return requestApi(
+    '/api/questionnaires',
+    postInit(body, idempotencyKey),
+    parseTaskExperience,
+    fetchImpl,
+  )
+}
+
+export function completeFormalSession(
+  input: {
+    sessionId: string
+    clientCompletedAt: string
+    clientSequence: number
+  },
+  idempotencyKey: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<FormalCompletionResponse> {
+  return requestApi(
+    `/api/sessions/${encodeURIComponent(input.sessionId)}/end`,
+    postInit(input, idempotencyKey),
+    parseCompletion,
+    fetchImpl,
+  )
 }
 
 export function resumeFormalSession(

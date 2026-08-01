@@ -437,6 +437,28 @@ p {
   background: rgba(10, 27, 45, 0.96);
 }
 
+.formal-completion-card {
+  text-align: center;
+}
+
+.formal-completion-mark {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 1.25rem auto;
+  place-items: center;
+  border: 1px solid rgba(99, 221, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(99, 221, 255, 0.08);
+  color: var(--cyan);
+  box-shadow: 0 0 28px rgba(99, 221, 255, 0.14);
+  font-size: 2rem;
+}
+
+.formal-completion-card .research-actions {
+  justify-content: center;
+}
+
 .research-field input:focus-visible {
   border-color: var(--cyan);
   outline: 2px solid rgba(99, 221, 255, 0.2);

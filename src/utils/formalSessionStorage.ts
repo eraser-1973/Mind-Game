@@ -10,13 +10,28 @@ export const PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY =
   'mind-game.pending.demographics.v1'
 export const PENDING_PRE_TASK_KEY_STORAGE_KEY =
   'mind-game.pending.pre-task.v1'
+export const PENDING_POST_TASK_KEY_STORAGE_KEY =
+  'mind-game.pending.post-task.v1'
+export const PENDING_TASK_EXPERIENCE_KEY_STORAGE_KEY =
+  'mind-game.pending.task-experience.v1'
+export const PENDING_COMPLETION_KEY_STORAGE_KEY =
+  'mind-game.pending.session-end.v1'
 
-export type FormalPendingOperation = 'consent' | 'demographics' | 'preTask'
+export type FormalPendingOperation =
+  | 'consent'
+  | 'demographics'
+  | 'preTask'
+  | 'postTask'
+  | 'taskExperience'
+  | 'completion'
 
 const operationKeys: Record<FormalPendingOperation, string> = {
   consent: PENDING_CONSENT_KEY_STORAGE_KEY,
   demographics: PENDING_DEMOGRAPHICS_KEY_STORAGE_KEY,
   preTask: PENDING_PRE_TASK_KEY_STORAGE_KEY,
+  postTask: PENDING_POST_TASK_KEY_STORAGE_KEY,
+  taskExperience: PENDING_TASK_EXPERIENCE_KEY_STORAGE_KEY,
+  completion: PENDING_COMPLETION_KEY_STORAGE_KEY,
 }
 
 const UUID_PATTERN =

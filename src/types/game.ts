@@ -13,6 +13,9 @@ export type FormalSessionStep =
   | 'game_ready'
   | 'playing'
   | 'post_task'
+  | 'task_experience'
+  | 'completion_pending'
+  | 'completed'
 export type PublicCandidateId = 'A' | 'B' | 'C' | 'D' | 'E'
 export type CandidateDisplayOrder = [
   PublicCandidateId,
@@ -31,7 +34,8 @@ export type ResearchStep =
   | 'preTask'
   | 'postTask'
   | 'taskExperience'
-  | 'report'
+  | 'completionPending'
+  | 'completion'
 
 export type FormalIdentityInput = {
   fullName?: string | null
@@ -99,6 +103,55 @@ export type FormalPreTaskResponse = {
   itemCount: 5
 }
 
+export type FormalPostTaskResponse = {
+  created: boolean
+  sessionId: string
+  currentStep: 'task_experience'
+  submissionId: string
+  itemCount: 5
+  sequenceNo: number
+}
+
+export type FormalTaskExperienceResponse = {
+  created: boolean
+  sessionId: string
+  currentStep: 'completion_pending'
+  submissionId: string
+  itemCount: 15
+  sequenceNo: number
+}
+
+export type FormalCompletionResponse = {
+  created: boolean
+  alreadyCompleted: boolean
+  sessionId: string
+  currentStep: 'completed'
+  completionStatus: 'completed' | 'timeout'
+  finalSubmitMode: 'active' | 'timeout'
+  serverCompletedAt: string
+  sequenceNo: number
+}
+
+export type FormalQuestionnaireResumeSummary =
+  | { saved: false }
+  | {
+      saved: true
+      instrumentVersion: string
+      itemCount: number
+      sequenceNo: number
+      serverSubmittedAt: string
+    }
+
+export type FormalCompletionResumeSummary =
+  | { completed: false }
+  | {
+      completed: true
+      completionStatus: 'completed' | 'timeout'
+      finalSubmitMode: 'active' | 'timeout'
+      serverCompletedAt: string
+      sequenceNo: number
+    }
+
 export type FormalResumeData = {
   session: FormalSessionContext & { mode: 'formal' }
   consent: {
@@ -125,6 +178,9 @@ export type FormalResumeData = {
   game: PreGameResumeState | FormalGameSnapshot
   sunkCost?: FormalSunkCostSnapshot | null
   finalDecision?: FormalFinalDecision | null
+  postTask?: FormalQuestionnaireResumeSummary
+  taskExperience?: FormalQuestionnaireResumeSummary
+  completion?: FormalCompletionResumeSummary
 }
 
 export type Evidence = {

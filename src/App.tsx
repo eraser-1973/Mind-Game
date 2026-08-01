@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
+  completeFormalSession,
   FormalResearchApiError,
   resumeFormalSession,
   saveFormalConsent,
   saveFormalDemographics,
+  saveFormalPostTaskQuestionnaire,
   saveFormalPreTaskQuestionnaire,
+  saveFormalTaskExperienceQuestionnaire,
 } from './api/formalResearch'
 import { createFormalSession } from './api/formalSessions'
 import { ConsentScreen } from './components/ConsentScreen'
 import { DemographicForm } from './components/DemographicForm'
 import { GameScreen } from './components/GameScreen'
+import { FormalCompletionPendingScreen } from './components/FormalCompletionPendingScreen'
+import { FormalCompletionScreen } from './components/FormalCompletionScreen'
 import { IdentityForm } from './components/IdentityForm'
-import { ReportScreen } from './components/ReportScreen'
 import { StartScreen } from './components/StartScreen'
 import { StateAssessmentScreen } from './components/StateAssessmentScreen'
 import { TaskExperienceScreen } from './components/TaskExperienceScreen'
@@ -22,7 +26,6 @@ import type {
   FormalSessionContext,
   FormalSessionStep,
   GameMode,
-  GameState,
   ResearchData,
   ResearchStep,
   StateAssessmentData,
@@ -40,7 +43,6 @@ import {
   removeFormalSessionContext,
   saveFormalSessionContext,
 } from './utils/formalSessionStorage'
-import { generateReport } from './utils/report'
 import { createResearchData } from './utils/researchData'
 import { clearAllFormalGamePendingKeys } from './utils/formalPendingKeys'
 
@@ -102,7 +104,10 @@ function stepToResearchStep(step: FormalSessionStep): ResearchStep | null {
   if (step === 'demographics') return 'demographics'
   if (step === 'pre_task') return 'preTask'
   if (step === 'game_ready') return null
-  if (step === 'post_task') return null
+  if (step === 'post_task') return 'postTask'
+  if (step === 'task_experience') return 'taskExperience'
+  if (step === 'completion_pending') return 'completionPending'
+  if (step === 'completed') return 'completion'
   return null
 }
 
@@ -151,16 +156,19 @@ export default function App() {
   const [sessionKey, setSessionKey] = useState(0)
   const [researchStep, setResearchStep] = useState<ResearchStep | null>(null)
   const [researchData, setResearchData] = useState<ResearchData | null>(null)
-  const [completedGameState, setCompletedGameState] = useState<GameState | null>(null)
   const [recoveryState, setRecoveryState] = useState<RecoveryState>('checking')
   const [formalActionError, setFormalActionError] = useState<FormalActionError>(null)
   const [formalGameSnapshot, setFormalGameSnapshot] = useState<FormalGameSnapshot | null>(null)
+  const formalLastSequenceNoRef = useRef<number | null>(null)
 
   const clearPendingKeys = () => {
     clearPendingCreationKey()
     clearPendingOperationKey('consent')
     clearPendingOperationKey('demographics')
     clearPendingOperationKey('preTask')
+    clearPendingOperationKey('postTask')
+    clearPendingOperationKey('taskExperience')
+    clearPendingOperationKey('completion')
     clearAllFormalGamePendingKeys()
   }
 
@@ -170,9 +178,9 @@ export default function App() {
     setMode(null)
     setResearchStep(null)
     setResearchData(null)
-    setCompletedGameState(null)
     setFormalActionError(null)
     setFormalGameSnapshot(null)
+    formalLastSequenceNoRef.current = null
     setRecoveryState('no_session')
     setSessionKey((value) => value + 1)
   }
@@ -197,6 +205,8 @@ export default function App() {
   }
 
   const applyResume = (resume: FormalResumeData) => {
+    formalLastSequenceNoRef.current =
+      resume.game.resumeSupported ? (resume.game.lastSequenceNo ?? null) : null
     saveFormalSessionContext(resume.session)
     setMode('formal')
     setResearchData(researchFromResume(resume))
@@ -246,10 +256,10 @@ export default function App() {
   }, [])
 
   const startMode = (nextMode: GameMode) => {
-    setCompletedGameState(null)
     setMode(nextMode)
     setFormalActionError(null)
     setFormalGameSnapshot(null)
+    formalLastSequenceNoRef.current = null
     if (nextMode === 'quick') {
       setResearchData(null)
       setResearchStep(null)
@@ -372,6 +382,71 @@ export default function App() {
     setResearchStep(null)
   }
 
+  const submitPostTask = async (
+    postTask: StateAssessmentData,
+    metadata: { submittedAt: string },
+  ) => {
+    const context = researchData?.formalSession
+    if (!isFormalSessionContext(context)) throw new Error('正式会话无效，请返回入口重试。')
+    const eventId = getOrCreatePendingOperationKey('postTask')
+    const result = await saveFormalPostTaskQuestionnaire({
+      sessionId: context.sessionId,
+      values: postTask,
+      clientSubmittedAt: metadata.submittedAt,
+    }, eventId)
+    persistContext(contextAtStep(context, result.currentStep), (current) => ({
+      ...current,
+      postTask,
+    }))
+    formalLastSequenceNoRef.current = result.sequenceNo
+    clearPendingOperationKey('postTask')
+    setResearchStep('taskExperience')
+  }
+
+  const submitTaskExperience = async (
+    taskExperience: TaskExperienceData,
+    metadata: { submittedAt: string },
+  ) => {
+    const context = researchData?.formalSession
+    if (!isFormalSessionContext(context)) throw new Error('正式会话无效，请返回入口重试。')
+    const eventId = getOrCreatePendingOperationKey('taskExperience')
+    const result = await saveFormalTaskExperienceQuestionnaire({
+      sessionId: context.sessionId,
+      values: taskExperience,
+      clientSubmittedAt: metadata.submittedAt,
+    }, eventId)
+    persistContext(contextAtStep(context, result.currentStep), (current) => ({
+      ...current,
+      taskExperience,
+    }))
+    formalLastSequenceNoRef.current = result.sequenceNo
+    clearPendingOperationKey('taskExperience')
+    setResearchStep('completionPending')
+  }
+
+  const finishFormalSession = async () => {
+    const context = researchData?.formalSession
+    if (!isFormalSessionContext(context) || context.currentStep !== 'completion_pending') {
+      throw new Error('正式会话尚未准备好完成提交。')
+    }
+    if (formalLastSequenceNoRef.current === null) {
+      throw new Error('无法确认服务器事件顺序，请刷新页面恢复会话后重试。')
+    }
+    const eventId = getOrCreatePendingOperationKey('completion')
+    const result = await completeFormalSession({
+      sessionId: context.sessionId,
+      clientCompletedAt: new Date().toISOString(),
+      clientSequence: formalLastSequenceNoRef.current + 1,
+    }, eventId)
+    persistContext(contextAtStep(context, result.currentStep), (current) => ({
+      ...current,
+      completedAt: result.serverCompletedAt,
+    }))
+    formalLastSequenceNoRef.current = result.sequenceNo
+    clearPendingOperationKey('completion')
+    setResearchStep('completion')
+  }
+
   if (recoveryState === 'checking') {
     return (
       <StatusScreen
@@ -480,43 +555,28 @@ export default function App() {
         <StateAssessmentScreen
           title="任务后状态评估"
           phase="after"
-          initialValue={researchData.postTask}
-          onSubmit={(postTask) => {
-            updateResearch((current) => ({ ...current, postTask }))
-            setResearchStep('taskExperience')
-          }}
+          onSubmit={(postTask, metadata) => submitPostTask(postTask, metadata)}
         />
       )
     }
     if (researchStep === 'taskExperience') {
       return (
         <TaskExperienceScreen
-          initialValue={researchData.taskExperience}
-          onBack={() => setResearchStep('postTask')}
-          onSubmit={(taskExperience: TaskExperienceData) => {
-            updateResearch((current) => ({
-              ...current,
-              taskExperience,
-              completedAt: new Date().toISOString(),
-            }))
-            setResearchStep('report')
-          }}
+          onSubmit={(taskExperience, metadata) =>
+            submitTaskExperience(taskExperience, metadata)}
         />
       )
     }
-    if (researchStep === 'report' && completedGameState) {
-      const reportState = {
-        ...completedGameState,
-        participantId: researchData.participantId,
-        researchData,
-      }
+    if (researchStep === 'completionPending') {
       return (
-        <ReportScreen
-          report={generateReport(reportState)}
-          sourceState={reportState}
-          onRestart={resetSession}
+        <FormalCompletionPendingScreen
+          onComplete={finishFormalSession}
+          onExit={resetSession}
         />
       )
+    }
+    if (researchStep === 'completion') {
+      return <FormalCompletionScreen onReturnHome={resetSession} />
     }
   }
 
@@ -545,19 +605,15 @@ export default function App() {
       onFormalGameSnapshot={mode === 'formal'
         ? (snapshot) => {
             setFormalGameSnapshot(snapshot)
+            formalLastSequenceNoRef.current = snapshot.lastSequenceNo ?? null
             const context = researchData?.formalSession
             if (context && context.currentStep !== 'playing' && !snapshot.finalDecision) {
               persistContext(contextAtStep(context, 'playing'))
             }
             if (context && snapshot.finalDecision && context.currentStep !== 'post_task') {
               persistContext(contextAtStep(context, 'post_task'))
+              setResearchStep('postTask')
             }
-          }
-        : undefined}
-      onGameComplete={mode === 'formal'
-        ? (state) => {
-            setCompletedGameState(state)
-            setResearchStep('postTask')
           }
         : undefined}
       onRestart={resetSession}

@@ -11,6 +11,9 @@ const SESSION_STEPS = [
   'game_ready',
   'playing',
   'post_task',
+  'task_experience',
+  'completion_pending',
+  'completed',
 ] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {

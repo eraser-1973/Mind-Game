@@ -17,7 +17,9 @@ const migrationPath = fileURLToPath(
 
 describe('0006 sunk cost and final decision migration', () => {
   it('creates versioned rules, event tables, indexes, and schema version 6', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({
+      throughMigration: '0006_sunk_cost_final_decision.sql',
+    })
     runtime = created.runtime
     const tables = await created.db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",

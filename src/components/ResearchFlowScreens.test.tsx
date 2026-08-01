@@ -170,4 +170,35 @@ describe('research flow screens', () => {
     expect(html).toContain('认知负荷与任务难度')
     expect(html).toContain('我对自己最终选择的候选人有信心。')
   })
+
+  it('requires all 15 task-experience items to be actively touched, including confidence zero', () => {
+    const onSubmit = vi.fn()
+    const renderer = create(
+      <TaskExperienceScreen onSubmit={onSubmit} />,
+    )
+    const questions = renderer.root.findAllByType(ScaleQuestion)
+    expect(questions).toHaveLength(15)
+    expect(questions.every((question) => question.props.value === null)).toBe(true)
+
+    act(() => renderer.root.findAllByType('button').at(-1)!.props.onClick())
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(1)
+
+    for (let index = 0; index < questions.length - 1; index += 1) {
+      act(() => renderer.root.findAllByType(ScaleQuestion)[index].props.onChange(1))
+    }
+    act(() => renderer.root.findAllByType(ScaleQuestion).at(-1)!.props.onChange(0))
+    act(() => renderer.root.findAllByType('button').at(-1)!.props.onClick())
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ timePressure1: 1, decisionConfidence: 0 }),
+      expect.objectContaining({
+        touched: expect.objectContaining({
+          timePressure1: true,
+          decisionConfidence: true,
+        }),
+        submittedAt: expect.any(String),
+      }),
+    )
+    renderer.unmount()
+  })
 })

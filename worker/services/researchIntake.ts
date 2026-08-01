@@ -12,17 +12,21 @@ import {
   findCurrentDemographics,
   findDemographicByEvent,
   findPreTaskQuestionnaire,
+  findQuestionnaireForPhase,
   findQuestionnaireAnswers,
   findQuestionnaireByEvent,
   insertConsentAndAdvance,
   insertDemographicRevision,
   insertPreTaskQuestionnaire,
+  insertPostGameQuestionnaire,
   type DemographicRow,
 } from '../repositories/researchIntake'
 import type {
   ConsentInput,
   DemographicsInput,
+  PostGameQuestionnaireInput,
   PreTaskQuestionnaireInput,
+  QuestionnaireInput,
 } from '../validation/researchIntakeRequest'
 
 export class ResearchIntakeError extends Error {
@@ -235,6 +239,118 @@ export async function savePreTaskQuestionnaire(
     submissionId,
     itemCount: input.answers.length,
   }
+}
+
+type RunSequenceRow = { last_sequence_no: number }
+
+function postGameQuestionnaireProjection(
+  row: {
+    submission_id: string
+    session_id: string
+    phase: string
+    item_count: number
+    sequence_no: number | null
+  },
+  created: boolean,
+) {
+  if (row.sequence_no === null) throw saveFailed()
+  return {
+    created,
+    sessionId: row.session_id,
+    currentStep: row.phase === 'post'
+      ? 'task_experience' as const
+      : 'completion_pending' as const,
+    submissionId: row.submission_id,
+    itemCount: row.item_count,
+    sequenceNo: row.sequence_no,
+  }
+}
+
+export async function savePostGameQuestionnaire(
+  db: D1Database,
+  session: AuthenticatedSession,
+  input: PostGameQuestionnaireInput,
+) {
+  const replay = await findQuestionnaireByEvent(db, input.eventId)
+  if (replay) {
+    if (replay.session_id !== session.sessionId || replay.phase !== input.phase) {
+      throw conflict('IDEMPOTENCY_CONFLICT', 'The idempotency key cannot be reused.')
+    }
+    return postGameQuestionnaireProjection(replay, false)
+  }
+  if (await findQuestionnaireForPhase(db, session.sessionId, input.phase)) {
+    throw conflict(
+      'QUESTIONNAIRE_ALREADY_SUBMITTED',
+      'The questionnaire has already been submitted.',
+    )
+  }
+  const expectedStep = input.phase === 'post' ? 'post_task' : 'task_experience'
+  if (session.currentStep !== expectedStep) {
+    throw conflict(
+      'INVALID_SESSION_STEP',
+      'The questionnaire cannot be submitted at the current step.',
+    )
+  }
+  const finalDecision = await db.prepare(
+    'SELECT final_decision_id FROM final_decisions WHERE session_id=?',
+  ).bind(session.sessionId).first<{ final_decision_id: string }>()
+  if (!finalDecision) {
+    throw conflict('FINAL_DECISION_REQUIRED', 'A sealed final decision is required.')
+  }
+  if (input.phase === 'task_experience' &&
+    !(await findQuestionnaireForPhase(db, session.sessionId, 'post'))) {
+    throw conflict('POST_TASK_REQUIRED', 'The post-task questionnaire is required.')
+  }
+
+  let run = await db.prepare(
+    'SELECT last_sequence_no FROM game_runs WHERE session_id=?',
+  ).bind(session.sessionId).first<RunSequenceRow>()
+  if (!run) throw conflict('GAME_NOT_STARTED', 'The formal game has not been started.')
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const submissionId = crypto.randomUUID()
+    const sequenceNo = run.last_sequence_no + 1
+    try {
+      await insertPostGameQuestionnaire(
+        db,
+        input,
+        submissionId,
+        sequenceNo,
+        run.last_sequence_no,
+        new Date().toISOString(),
+      )
+      const saved = await findQuestionnaireByEvent(db, input.eventId)
+      if (!saved) throw saveFailed()
+      return postGameQuestionnaireProjection(saved, true)
+    } catch {
+      const winner = await findQuestionnaireByEvent(db, input.eventId)
+      if (winner?.session_id === session.sessionId && winner.phase === input.phase) {
+        return postGameQuestionnaireProjection(winner, false)
+      }
+      if (await findQuestionnaireForPhase(db, session.sessionId, input.phase)) {
+        throw conflict(
+          'QUESTIONNAIRE_ALREADY_SUBMITTED',
+          'The questionnaire has already been submitted.',
+        )
+      }
+      const latest = await db.prepare(
+        'SELECT last_sequence_no FROM game_runs WHERE session_id=?',
+      ).bind(session.sessionId).first<RunSequenceRow>()
+      if (!latest) throw saveFailed()
+      run = latest
+    }
+  }
+  throw saveFailed()
+}
+
+export function saveQuestionnaire(
+  db: D1Database,
+  session: AuthenticatedSession,
+  input: QuestionnaireInput,
+) {
+  return input.phase === 'pre'
+    ? savePreTaskQuestionnaire(db, session, input)
+    : savePostGameQuestionnaire(db, session, input)
 }
 
 export async function loadResumeProjection(

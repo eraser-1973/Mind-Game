@@ -7,6 +7,15 @@ import {
   FORMAL_GAME_DURATION_SEC,
 } from '../domain/gameClock'
 import { deriveFormalStageStatus } from '../domain/formalStage'
+import {
+  POST_TASK_INSTRUMENT,
+  TASK_EXPERIENCE_INSTRUMENT,
+  type QuestionnaireInstrument,
+} from '../domain/questionnaireInstruments'
+import {
+  findQuestionnaireAnswers,
+  findQuestionnaireForPhase,
+} from '../repositories/researchIntake'
 import type {
   FormalRatingInput,
   FormalRatingStage,
@@ -19,6 +28,7 @@ import {
 } from './formalEvidence'
 import { assertNoPendingSunkCost, finalizeExpiredFormalGame } from './sunkCostFinal'
 import { loadSafeFinalDecision, loadSafeSunkCost } from './sunkCostFinal'
+import { loadCompletionProjection } from './formalCompletion'
 
 export { FormalGameError } from '../domain/formalGameError'
 
@@ -712,11 +722,57 @@ export async function saveFormalStageChoice(
 export const saveT1Rating = saveFormalRating
 export const saveT1StageChoice = saveFormalStageChoice
 
+async function loadSealedQuestionnaireSummary(
+  db: D1Database,
+  sessionId: string,
+  phase: 'post' | 'task_experience',
+  instrument: QuestionnaireInstrument,
+) {
+  const submission = await findQuestionnaireForPhase(db, sessionId, phase)
+  if (!submission) return null
+  const answers = await findQuestionnaireAnswers(db, submission.submission_id)
+  const answersById = new Map(answers.map((answer) => [answer.item_id, answer]))
+  const valid = submission.phase === instrument.phase &&
+    submission.instrument_version === instrument.version &&
+    submission.item_count === instrument.items.length &&
+    submission.sequence_no !== null && submission.sequence_no > 0 &&
+    answers.length === instrument.items.length &&
+    instrument.items.every((item) => {
+      const answer = answersById.get(item.id)
+      return answer?.touched === 1 && Number.isInteger(answer.value) &&
+        answer.value >= item.min && answer.value <= item.max
+    })
+  if (!valid) {
+    throw conflict(
+      'SESSION_DATA_INTEGRITY_ERROR',
+      'The formal questionnaire state is internally inconsistent and cannot be resumed.',
+    )
+  }
+  return {
+    saved: true as const,
+    instrumentVersion: submission.instrument_version,
+    itemCount: submission.item_count,
+    sequenceNo: submission.sequence_no,
+    serverSubmittedAt: submission.server_submitted_at,
+  }
+}
+
+function unsavedQuestionnaire() {
+  return { saved: false as const }
+}
+
 export async function loadFormalGameResume(
   db: D1Database,
   session: AuthenticatedSession,
 ) {
-  if (session.currentStep !== 'playing' && session.currentStep !== 'post_task') {
+  const resumableSteps = [
+    'playing',
+    'post_task',
+    'task_experience',
+    'completion_pending',
+    'completed',
+  ] as const
+  if (!(resumableSteps as readonly string[]).includes(session.currentStep)) {
     throw conflict('GAME_RESUME_NOT_READY', 'The formal game is not in a resumable state.')
   }
   const run = await findRun(db, session.sessionId)
@@ -727,6 +783,33 @@ export async function loadFormalGameResume(
     )
   }
   const candidateDisplayOrder = parseOrder(session)
+  const [postTask, taskExperience, completion] = await Promise.all([
+    loadSealedQuestionnaireSummary(
+      db,
+      session.sessionId,
+      'post',
+      POST_TASK_INSTRUMENT,
+    ),
+    loadSealedQuestionnaireSummary(
+      db,
+      session.sessionId,
+      'task_experience',
+      TASK_EXPERIENCE_INSTRUMENT,
+    ),
+    loadCompletionProjection(db, session.sessionId),
+  ])
+  const postGameIntegrity =
+    (session.currentStep === 'playing' && !postTask && !taskExperience && !completion) ||
+    (session.currentStep === 'post_task' && !postTask && !taskExperience && !completion) ||
+    (session.currentStep === 'task_experience' && postTask && !taskExperience && !completion) ||
+    (session.currentStep === 'completion_pending' && postTask && taskExperience && !completion) ||
+    (session.currentStep === 'completed' && postTask && taskExperience && completion)
+  if (!postGameIntegrity) {
+    throw conflict(
+      'SESSION_DATA_INTEGRITY_ERROR',
+      'The formal post-task state is internally inconsistent and cannot be resumed.',
+    )
+  }
   return {
     session: {
       participantId: session.participantId,
@@ -744,7 +827,7 @@ export async function loadFormalGameResume(
       },
       candidateDisplayOrder,
       initialOpenedCandidate: session.initialOpenedCandidate,
-      currentStep: session.currentStep as 'playing' | 'post_task',
+      currentStep: session.currentStep as typeof resumableSteps[number],
       createdAt: session.createdAt,
     },
     consent: null,
@@ -753,5 +836,16 @@ export async function loadFormalGameResume(
     game: await projectRun(db, session, run),
     sunkCost: await loadSafeSunkCost(db, session.sessionId),
     finalDecision: await loadSafeFinalDecision(db, session.sessionId),
+    postTask: postTask ?? unsavedQuestionnaire(),
+    taskExperience: taskExperience ?? unsavedQuestionnaire(),
+    completion: completion
+      ? {
+          completed: true as const,
+          completionStatus: completion.completionStatus,
+          finalSubmitMode: completion.finalSubmitMode,
+          serverCompletedAt: completion.serverCompletedAt,
+          sequenceNo: completion.sequenceNo,
+        }
+      : { completed: false as const },
   }
 }

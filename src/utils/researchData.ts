@@ -4,7 +4,7 @@ import type {
   StateAssessmentData,
   TaskExperienceData,
 } from '../types/game'
-import { defaultTaskExperience } from '../data/researchFlow'
+import { taskExperienceGroups } from '../data/researchFlow'
 import type { ReportData } from '../types/game'
 
 const IDENTIFIABLE_KEYS = [
@@ -67,13 +67,14 @@ export function normalizeStateAssessment(
 export function normalizeTaskExperience(
   data: TaskExperienceData,
 ): TaskExperienceData {
+  const itemIds = taskExperienceGroups.flatMap((group) =>
+    group.items.map((item) => item.id))
   return Object.fromEntries(
-    Object.entries(defaultTaskExperience).map(([key, fallback]) => {
-      const typedKey = key as keyof TaskExperienceData
+    itemIds.map((typedKey) => {
       const min = typedKey === 'decisionConfidence' ? 0 : 1
       return [
         typedKey,
-        clampScaleValue(data[typedKey] ?? fallback, min, 10),
+        clampScaleValue(data[typedKey], min, 10),
       ]
     }),
   ) as TaskExperienceData

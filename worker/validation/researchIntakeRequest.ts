@@ -1,15 +1,13 @@
+import {
+  findQuestionnaireInstrument,
+  PRE_TASK_INSTRUMENT,
+  type PublicQuestionnairePhase,
+} from '../domain/questionnaireInstruments'
+
 const MAX_BODY_BYTES = 16 * 1024
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const CONSENT_VERSION = 'consent-1.0.0'
-const PRE_INSTRUMENT_VERSION = 'state-assessment-pre-1.0.0'
-const PRE_ITEM_IDS = [
-  'stress',
-  'fatigue',
-  'attention',
-  'mood',
-  'physicalDiscomfort',
-] as const
 
 const demographicValues = {
   ageRange: ['18–20', '21–23', '24及以上', '不愿透露'],
@@ -72,11 +70,24 @@ export type PreTaskQuestionnaireInput = {
   eventId: string
   sessionId: string
   phase: 'pre'
-  instrumentVersion: typeof PRE_INSTRUMENT_VERSION
+  instrumentVersion: typeof PRE_TASK_INSTRUMENT.version
   clientStartedAt: string
   clientSubmittedAt: string
   answers: QuestionnaireAnswerInput[]
 }
+
+export type PostGameQuestionnaireInput = {
+  eventId: string
+  sessionId: string
+  phase: 'post' | 'task_experience'
+  instrumentVersion: string
+  clientSubmittedAt: string
+  answers: QuestionnaireAnswerInput[]
+}
+
+export type QuestionnaireInput =
+  | PreTaskQuestionnaireInput
+  | PostGameQuestionnaireInput
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -213,20 +224,35 @@ export async function parseDemographicsRequest(request: Request): Promise<Demogr
   }
 }
 
-export async function parsePreTaskQuestionnaireRequest(
+export async function parseQuestionnaireRequest(
   request: Request,
-): Promise<PreTaskQuestionnaireInput> {
+): Promise<QuestionnaireInput> {
   const eventId = readIdempotencyKey(request)
   const body = await readResearchJson(request)
-  if (!hasExactKeys(body, [
-    'sessionId', 'phase', 'instrumentVersion', 'clientStartedAt',
-    'clientSubmittedAt', 'answers',
-  ])) throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+  if (body.phase === 'manipulation') {
+    throw requestError(
+      'PHASE_NOT_AVAILABLE',
+      'The manipulation phase is not available as a separate submission.',
+    )
+  }
+  if (typeof body.phase !== 'string') {
+    throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+  }
+  const instrument = findQuestionnaireInstrument(body.phase)
+  if (!instrument) {
+    throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+  }
+  const isPre = instrument.phase === 'pre'
+  const expectedKeys = isPre
+    ? ['sessionId', 'phase', 'instrumentVersion', 'clientStartedAt', 'clientSubmittedAt', 'answers']
+    : ['sessionId', 'phase', 'instrumentVersion', 'clientSubmittedAt', 'answers']
+  if (!hasExactKeys(body, expectedKeys)) {
+    throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+  }
   if (
-    body.phase !== 'pre' ||
-    body.instrumentVersion !== PRE_INSTRUMENT_VERSION ||
+    body.instrumentVersion !== instrument.version ||
     !Array.isArray(body.answers) ||
-    body.answers.length !== PRE_ITEM_IDS.length
+    body.answers.length !== instrument.items.length
   ) throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
 
   const answers: QuestionnaireAnswerInput[] = []
@@ -237,36 +263,54 @@ export async function parsePreTaskQuestionnaireRequest(
     if (raw.touched !== true) {
       throw requestError('QUESTIONNAIRE_INCOMPLETE', 'Every questionnaire item must be answered explicitly.')
     }
-    if (
-      typeof raw.itemId !== 'string' ||
-      !PRE_ITEM_IDS.some((itemId) => itemId === raw.itemId) ||
-      !Number.isInteger(raw.value) ||
-      (raw.value as number) < 0 ||
-      (raw.value as number) > 10
-    ) throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+    const item = typeof raw.itemId === 'string'
+      ? instrument.items.find(({ id }) => id === raw.itemId)
+      : undefined
+    if (!item || !Number.isInteger(raw.value) ||
+      (raw.value as number) < item.min || (raw.value as number) > item.max) {
+      throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+    }
     answers.push({
-      itemId: raw.itemId,
+      itemId: raw.itemId as string,
       value: raw.value as number,
       touched: true,
       answeredAt: parseIsoTimestamp(raw.answeredAt),
     })
   }
-  if (new Set(answers.map((answer) => answer.itemId)).size !== PRE_ITEM_IDS.length) {
+  if (new Set(answers.map((answer) => answer.itemId)).size !== instrument.items.length) {
     throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
   }
 
-  const clientStartedAt = parseIsoTimestamp(body.clientStartedAt)
   const clientSubmittedAt = parseIsoTimestamp(body.clientSubmittedAt)
+  const common = {
+    eventId,
+    sessionId: requireUuid(body.sessionId),
+    phase: instrument.phase as PublicQuestionnairePhase,
+    instrumentVersion: instrument.version,
+    clientSubmittedAt,
+    answers,
+  }
+  if (!isPre) {
+    return common as PostGameQuestionnaireInput
+  }
+  const clientStartedAt = parseIsoTimestamp(body.clientStartedAt)
   if (Date.parse(clientSubmittedAt) < Date.parse(clientStartedAt)) {
     throw requestError('INVALID_TIMESTAMP', 'Questionnaire timestamps are inconsistent.')
   }
   return {
-    eventId,
-    sessionId: requireUuid(body.sessionId),
+    ...common,
     phase: 'pre',
-    instrumentVersion: PRE_INSTRUMENT_VERSION,
+    instrumentVersion: PRE_TASK_INSTRUMENT.version,
     clientStartedAt,
-    clientSubmittedAt,
-    answers,
   }
+}
+
+export async function parsePreTaskQuestionnaireRequest(
+  request: Request,
+): Promise<PreTaskQuestionnaireInput> {
+  const input = await parseQuestionnaireRequest(request)
+  if (input.phase !== 'pre') {
+    throw requestError('INVALID_QUESTIONNAIRE', 'The questionnaire response is invalid.')
+  }
+  return input
 }

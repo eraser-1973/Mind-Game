@@ -20,6 +20,7 @@ import {
   handleSunkCostShow,
   handleTimeoutFinalDecision,
 } from './routes/sunkCostFinal'
+import { handleFormalSessionEnd } from './routes/formalCompletion'
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
@@ -86,6 +87,11 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
   const resumeMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/resume$/)
   if (resumeMatch) {
     return handleSessionResume(request, env, requestId, resumeMatch[1])
+  }
+
+  const endMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/end$/)
+  if (endMatch) {
+    return handleFormalSessionEnd(request, env, requestId, endMatch[1])
   }
 
   return errorResponse(

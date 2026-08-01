@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { DemographicData, StateAssessmentData } from '../types/game'
+import type {
+  DemographicData,
+  StateAssessmentData,
+  TaskExperienceData,
+} from '../types/game'
 import {
+  completeFormalSession,
   resumeFormalSession,
   saveFormalConsent,
   saveFormalDemographics,
+  saveFormalPostTaskQuestionnaire,
   saveFormalPreTaskQuestionnaire,
+  saveFormalTaskExperienceQuestionnaire,
   type FetchLike,
 } from './formalResearch'
 
@@ -25,6 +32,13 @@ const preTask: StateAssessmentData = {
   mood: 3,
   physicalDiscomfort: 4,
 }
+const taskExperience = Object.fromEntries([
+  'timePressure1', 'timePressure2', 'resourceLimit1', 'resourceLimit2',
+  'socialEvaluation1', 'socialEvaluation2', 'outcomeResponsibility1',
+  'outcomeResponsibility2', 'uncontrollability1', 'uncontrollability2',
+  'cognitiveLoad1', 'cognitiveLoad2', 'cognitiveLoad3', 'cognitiveLoad4',
+  'decisionConfidence',
+].map((itemId) => [itemId, itemId === 'decisionConfidence' ? 0 : 1])) as TaskExperienceData
 
 function ok(data: unknown, status = 200) {
   return new Response(JSON.stringify({ ok: true, data, requestId: 'request-1' }), {
@@ -94,6 +108,78 @@ describe('formal research API client', () => {
     expect(body.answers).toHaveLength(5)
     expect(body.answers.every((answer: { touched: boolean }) => answer.touched)).toBe(true)
     expect(body.answers.find((answer: { itemId: string }) => answer.itemId === 'stress').value).toBe(0)
+  })
+
+  it('submits post-task and task-experience answers to the shared questionnaire API', async () => {
+    const fetchImpl = vi.fn<FetchLike>(async (_input, init) => {
+      const body = JSON.parse(String(init?.body))
+      return ok({
+        created: true,
+        sessionId,
+        currentStep: body.phase === 'post' ? 'task_experience' : 'completion_pending',
+        submissionId: crypto.randomUUID(),
+        itemCount: body.answers.length,
+        sequenceNo: body.phase === 'post' ? 18 : 19,
+      }, 201)
+    })
+    const submittedAt = '2026-08-01T00:20:00.000Z'
+    await saveFormalPostTaskQuestionnaire({
+      sessionId,
+      values: preTask,
+      clientSubmittedAt: submittedAt,
+    }, key, fetchImpl)
+    await saveFormalTaskExperienceQuestionnaire({
+      sessionId,
+      values: taskExperience,
+      clientSubmittedAt: submittedAt,
+    }, key, fetchImpl)
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    const postBody = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))
+    const taskBody = JSON.parse(String(fetchImpl.mock.calls[1][1]?.body))
+    expect(postBody).toMatchObject({
+      phase: 'post',
+      instrumentVersion: 'state-assessment-post-1.0.0',
+    })
+    expect(postBody.answers).toHaveLength(5)
+    expect(postBody.answers.every((answer: { touched: boolean }) => answer.touched)).toBe(true)
+    expect(postBody).not.toHaveProperty('clientStartedAt')
+    expect(taskBody).toMatchObject({
+      phase: 'task_experience',
+      instrumentVersion: 'task-experience-1.0.0',
+    })
+    expect(taskBody.answers).toHaveLength(15)
+    expect(taskBody.answers.find((answer: { itemId: string }) =>
+      answer.itemId === 'decisionConfidence').value).toBe(0)
+  })
+
+  it('ends a formal session without accepting client-authored status or result fields', async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => ok({
+      created: true,
+      alreadyCompleted: false,
+      sessionId,
+      currentStep: 'completed',
+      completionStatus: 'completed',
+      finalSubmitMode: 'active',
+      serverCompletedAt: '2026-08-01T00:21:00.000Z',
+      sequenceNo: 20,
+    }, 201))
+    await completeFormalSession({
+      sessionId,
+      clientCompletedAt: '2026-08-01T00:20:30.000Z',
+      clientSequence: 20,
+    }, key, fetchImpl)
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `/api/sessions/${sessionId}/end`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+    const body = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))
+    expect(body).toEqual({
+      sessionId,
+      clientCompletedAt: '2026-08-01T00:20:30.000Z',
+      clientSequence: 20,
+    })
   })
 
   it('loads the authenticated safe resume projection without a write key', async () => {

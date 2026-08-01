@@ -6,13 +6,13 @@ import {
   ResearchIntakeError,
   saveConsent,
   saveDemographics,
-  savePreTaskQuestionnaire,
+  saveQuestionnaire,
 } from '../services/researchIntake'
 import { FormalGameError, loadFormalGameResume } from '../services/formalGame'
 import {
   parseConsentRequest,
   parseDemographicsRequest,
-  parsePreTaskQuestionnaireRequest,
+  parseQuestionnaireRequest,
   ResearchIntakeRequestError,
   requireUuid,
 } from '../validation/researchIntakeRequest'
@@ -94,9 +94,13 @@ export async function handleQuestionnaires(
 ): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(requestId, 'POST')
   try {
-    const input = await parsePreTaskQuestionnaireRequest(request)
-    const session = await authenticateFormalSession(request, env.DB, input.sessionId)
-    const data = await savePreTaskQuestionnaire(env.DB, session, input)
+    const input = await parseQuestionnaireRequest(request)
+    const session = await authenticateFormalSession(request, env.DB, input.sessionId, {
+      allowedCompletionStatuses: input.phase === 'pre'
+        ? ['in_progress']
+        : ['in_progress', 'timeout'],
+    })
+    const data = await saveQuestionnaire(env.DB, session, input)
     return successResponse(data, requestId, data.created ? 201 : 200)
   } catch (error) {
     return errorResult(error, requestId)
@@ -115,7 +119,13 @@ export async function handleSessionResume(
     const session = await authenticateFormalSession(request, env.DB, sessionId, {
       allowedCompletionStatuses: ['in_progress', 'timeout', 'completed'],
     })
-    const data = session.currentStep === 'playing' || session.currentStep === 'post_task'
+    const data = [
+      'playing',
+      'post_task',
+      'task_experience',
+      'completion_pending',
+      'completed',
+    ].includes(session.currentStep)
       ? await loadFormalGameResume(env.DB, session)
       : await loadResumeProjection(env.DB, session)
     return successResponse(data, requestId)
