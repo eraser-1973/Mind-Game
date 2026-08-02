@@ -204,13 +204,14 @@ describe('App Stage 7 formal post-task flow', () => {
     expect(renderer!.root.findAllByType(FormalCompletionScreen)).toHaveLength(1)
     const html = JSON.stringify(renderer!.toJSON())
     expect(html).toContain('提交成功')
-    expect(html).not.toMatch(/RDI|高韧性|中间型|脆弱型|导出 JSON|候选人推荐|超时样本/i)
+    expect(html).not.toMatch(/\b(?:RES|EAC|EACS|DDS|GDS|SLS|RDI)\b|高韧性|中间型|脆弱型|导出 JSON|候选人推荐|超时样本/i)
     expect(paths).toEqual([
       `/api/sessions/${sessionId}/resume`,
       '/api/questionnaires',
       '/api/questionnaires',
       `/api/sessions/${sessionId}/end`,
     ])
+    expect(paths.some((path) => /scoring|metrics|recompute/i.test(path))).toBe(false)
     expect((bodies[0] as { answers: unknown[] }).answers).toHaveLength(5)
     expect((bodies[1] as { answers: unknown[] }).answers).toHaveLength(15)
     expect(JSON.stringify(bodies)).not.toMatch(/fullName|studentId|phone|RDI|score|level/i)

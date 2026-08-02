@@ -5,6 +5,7 @@ import {
   type QuestionnaireInstrument,
 } from '../domain/questionnaireInstruments'
 import type { FormalCompletionInput } from '../validation/formalCompletionRequest'
+import { ensurePrepilotScoringRun } from './prepilotScoring'
 
 type CompletionRow = {
   completion_id: string
@@ -93,6 +94,22 @@ function projection(row: CompletionRow, created: boolean) {
   }
 }
 
+async function projectionAfterScoring(
+  db: D1Database,
+  row: CompletionRow,
+  created: boolean,
+) {
+  const safeProjection = projection(row, created)
+  try {
+    await ensurePrepilotScoringRun(db, row.session_id)
+  } catch {
+    // Formal completion is the durable source fact. Stage 8 scoring is an
+    // isolated internal follow-up and must never change the participant reply.
+    console.error('PREPILOT_SCORING_FOLLOW_UP_FAILED')
+  }
+  return safeProjection
+}
+
 async function loadSubmission(
   db: D1Database,
   sessionId: string,
@@ -162,10 +179,10 @@ export async function completeFormalSession(
     if (replay.session_id !== session.sessionId) {
       throw conflict('IDEMPOTENCY_CONFLICT', 'The idempotency key cannot be reused.')
     }
-    return projection(replay, false)
+    return projectionAfterScoring(db, replay, false)
   }
   const existing = await findCompletionForSession(db, session.sessionId)
-  if (existing) return projection(existing, false)
+  if (existing) return projectionAfterScoring(db, existing, false)
   if (session.currentStep !== 'completion_pending') {
     throw conflict('INVALID_SESSION_STEP', 'The session is not ready to be completed.')
   }
@@ -269,10 +286,10 @@ export async function completeFormalSession(
       ])
       const saved = await findCompletionByEvent(db, input.eventId)
       if (!saved) throw inconsistent()
-      return projection(saved, true)
+      return projectionAfterScoring(db, saved, true)
     } catch {
       const winner = await findCompletionForSession(db, session.sessionId)
-      if (winner) return projection(winner, false)
+      if (winner) return projectionAfterScoring(db, winner, false)
       throw inconsistent()
     }
   }

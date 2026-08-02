@@ -54,7 +54,9 @@ async function seedFinalizedSession(db: D1Database, suffix: string) {
 
 describe('0007 post-task completion migration', () => {
   it('creates the Stage 7 schema, indexes, triggers, and schema version 7', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({
+      throughMigration: '0007_post_task_completion.sql',
+    })
     runtime = created.runtime
 
     const schema = await created.db.prepare(

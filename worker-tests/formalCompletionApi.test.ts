@@ -43,6 +43,14 @@ async function createSession(mode: 'active' | 'timeout' = 'active'): Promise<Tes
     cookie: (response.headers.get('Set-Cookie') ?? '').split(';')[0],
   }
   const at = '2026-08-01T01:00:00.000Z'
+  const sealedRatings = (['A', 'B', 'C', 'D', 'E'] as const).map(
+    (candidateId, index) => db!.prepare(`INSERT INTO stage_ratings (
+      rating_id,event_id,session_id,candidate_id,stage,rating_value,
+      evidence_ids_seen,client_submitted_at,server_submitted_at,sequence_no
+    ) VALUES (?,?,?,?,'T1',50,json('[]'),?,?,?)`)
+      .bind(crypto.randomUUID(), crypto.randomUUID(), session.sessionId,
+        candidateId, at, at, index + 1),
+  )
   await db!.batch([
     db!.prepare(`UPDATE sessions SET current_step='post_task',completion_status=?,
       final_submit_mode=?,started_at='2026-08-01T00:45:00.000Z',
@@ -61,10 +69,23 @@ async function createSession(mode: 'active' | 'timeout' = 'active'): Promise<Tes
       source_stage,selection_origin,auto_selected,client_submitted_at,
       server_submitted_at,sequence_no,remaining_sec_at_submit,
       points_remaining_at_submit,sunk_cost_choice,created_at
-    ) VALUES (?,?,?,'B',75,?,'T2',?,?,?, ?,7,60,5,'not_triggered',?)`)
+    ) VALUES (?,?,?,'B',75,?,'T1',?,?,?, ?,7,60,5,'not_triggered',?)`)
       .bind(crypto.randomUUID(), crypto.randomUUID(), session.sessionId, mode,
         mode === 'active' ? 'active_user' : 'timeout_latest_sealed_choice',
         mode === 'active' ? 0 : 1, mode === 'active' ? at : null, at, at),
+    ...sealedRatings,
+    db!.prepare(`INSERT INTO stage_choices (
+      choice_id,event_id,session_id,stage,candidate_id,confidence,submit_mode,
+      client_submitted_at,server_submitted_at,sequence_no
+    ) VALUES (?,?,?,'T1','B',75,'active',?,?,6)`)
+      .bind(crypto.randomUUID(), crypto.randomUUID(), session.sessionId, at, at),
+    db!.prepare(`INSERT INTO sunk_cost_events (
+      sunk_event_id,session_id,target_candidate_id,trigger_rule_version,
+      trigger_reason,risk_evidence_ids_seen,points_invested_before,choice,
+      points_after_choice,choice_status,created_at,updated_at
+    ) VALUES (?,?,NULL,'sunk-1.0.0','rule_not_eligible',json('[]'),0,
+      'not_triggered',0,'not_triggered',?,?)`)
+      .bind(crypto.randomUUID(), session.sessionId, at, at),
   ])
   return session
 }
@@ -183,6 +204,15 @@ describe('POST /api/sessions/:sessionId/end', () => {
     expect((await db!.prepare(`SELECT COUNT(*) AS count FROM game_events
       WHERE session_id=? AND event_type='session_complete'`).bind(session.sessionId)
       .first<{ count: number }>())?.count).toBe(1)
+    const scoring = await db!.prepare(`SELECT run_status,is_current,rdi_status
+      FROM scoring_runs WHERE session_id=?`).bind(session.sessionId)
+      .first<Record<string, unknown>>()
+    expect(scoring).toEqual({
+      run_status: 'partial',
+      is_current: 1,
+      rdi_status: 'norms_unavailable',
+    })
+    expect(JSON.stringify(payload.data)).not.toMatch(/RES|EAC|DDS|GDS|SLS|RDI|scoring/i)
   })
 
   it('replays the same or a different key without changing sequence or ended_at', async () => {
@@ -206,6 +236,42 @@ describe('POST /api/sessions/:sessionId/end', () => {
       .bind(session.sessionId).first<{ ended_at: string }>())?.ended_at).toBe(first?.ended_at)
     expect((await db!.prepare(`SELECT COUNT(*) AS count FROM completion_records
       WHERE session_id=?`).bind(session.sessionId).first<{ count: number }>())?.count).toBe(1)
+    expect((await db!.prepare(`SELECT COUNT(*) AS count FROM scoring_runs
+      WHERE session_id=?`).bind(session.sessionId).first<{ count: number }>())?.count).toBe(1)
+  })
+
+  it('keeps completion successful when post-commit scoring input is inconsistent', async () => {
+    await setup()
+    const session = await prepareCompletion()
+    await db!.prepare(`DELETE FROM stage_ratings
+      WHERE session_id=? AND candidate_id='E' AND stage='T1'`)
+      .bind(session.sessionId).run()
+
+    const response = await endSession(session)
+    expect(response.status).toBe(201)
+    const payload = await response.json() as { data: Record<string, unknown> }
+    expect(payload.data).toMatchObject({
+      currentStep: 'completed',
+      completionStatus: 'completed',
+    })
+    expect(JSON.stringify(payload.data)).not.toMatch(/failed|scoring|INPUT_INCOMPLETE/i)
+    const sessionRow = await db!.prepare(`SELECT current_step,completion_status,
+      ended_at,error_count FROM sessions WHERE session_id=?`).bind(session.sessionId)
+      .first<Record<string, unknown>>()
+    expect(sessionRow).toMatchObject({
+      current_step: 'completed',
+      completion_status: 'completed',
+      ended_at: expect.any(String),
+      error_count: 1,
+    })
+    const failed = await db!.prepare(`SELECT run_status,failure_code,is_current
+      FROM scoring_runs WHERE session_id=?`).bind(session.sessionId)
+      .first<Record<string, unknown>>()
+    expect(failed).toEqual({
+      run_status: 'failed',
+      failure_code: 'INPUT_INCOMPLETE',
+      is_current: 0,
+    })
   })
 
   it('converges concurrent end calls on one completion and one event', async () => {
