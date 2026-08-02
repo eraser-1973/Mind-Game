@@ -1,5 +1,6 @@
 import type { Env } from './env'
 import { errorResponse } from './http/responses'
+import { fetchAsset } from './http/adminAssets'
 import { handleHealth } from './routes/health'
 import {
   handleStartFormalGame,
@@ -21,15 +22,20 @@ import {
   handleTimeoutFinalDecision,
 } from './routes/sunkCostFinal'
 import { handleFormalSessionEnd } from './routes/formalCompletion'
+import { handleAdminRequest } from './routes/admin'
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
 
   if (!url.pathname.startsWith('/api/')) {
-    return env.ASSETS.fetch(request)
+    return fetchAsset(request, env.ASSETS)
   }
 
   const requestId = crypto.randomUUID()
+
+  if (url.pathname === '/api/admin' || url.pathname.startsWith('/api/admin/')) {
+    return handleAdminRequest(request, env, requestId)
+  }
 
   if (url.pathname === '/api/health') {
     return handleHealth(request, env, requestId)

@@ -2028,6 +2028,179 @@ p {
   font-size: 0.72rem;
 }
 
+/* Administrator security console */
+
+.admin-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(32, 143, 190, 0.16), transparent 32%),
+    linear-gradient(145deg, #040810, #07111f 55%, #050a13);
+}
+
+.admin-login-card,
+.admin-console-header,
+.admin-session-card,
+.admin-panel {
+  border: 1px solid var(--line);
+  background: rgba(8, 18, 33, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.admin-login-card {
+  width: min(480px, 100%);
+  padding: clamp(1.4rem, 5vw, 2.5rem);
+}
+
+.admin-login-card > p,
+.admin-console-header p,
+.admin-stage-note,
+.admin-empty {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.admin-login-form label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.admin-login-form input {
+  min-height: 48px;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  background: rgba(4, 12, 23, 0.9);
+}
+
+.admin-form-error {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 174, 87, 0.35);
+  color: #ffd29f;
+  background: rgba(255, 174, 87, 0.06);
+  font-size: 0.72rem;
+}
+
+.admin-shell--dashboard {
+  align-content: start;
+  grid-template-columns: minmax(0, 1040px);
+  gap: 1rem;
+}
+
+.admin-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.admin-console-header h1,
+.admin-console-header p {
+  margin-bottom: 0;
+}
+
+.admin-session-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+}
+
+.admin-session-card > div {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.1rem 1.25rem;
+  background: rgba(13, 29, 50, 0.85);
+}
+
+.admin-session-card span,
+.admin-audit-list time,
+.admin-audit-list small {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.admin-session-card strong {
+  color: var(--cyan);
+  font: 700 0.88rem Consolas, monospace;
+}
+
+.admin-panel {
+  padding: 1.35rem;
+}
+
+.admin-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-panel__heading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.admin-status-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  color: var(--cyan);
+  font-size: 0.62rem;
+}
+
+.admin-audit-list {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.admin-audit-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.admin-audit-list article > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.admin-audit-list strong {
+  font-size: 0.76rem;
+}
+
+.admin-audit-list article > div span {
+  color: var(--cyan);
+  font: 700 0.58rem Consolas, monospace;
+}
+
+.admin-stage-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.7rem;
+}
+
 /* Responsive */
 
 @media (max-width: 1180px) {
@@ -2173,6 +2346,9 @@ p {
   .log-list p,
   .log-list small { grid-column: 1 / -1; }
   .report-actions { flex-direction: column; }
+  .admin-console-header { align-items: stretch; flex-direction: column; }
+  .admin-session-card { grid-template-columns: 1fr; }
+  .admin-audit-list article { grid-template-columns: 1fr; gap: 0.35rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
