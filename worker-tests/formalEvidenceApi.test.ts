@@ -148,9 +148,10 @@ describe('formal shallow evidence unlock', () => {
     const key = crypto.randomUUID()
     const first = await unlock(session, 'A', 'shallow', key)
     const replay = await unlock(session, 'A', 'shallow', key)
+    const replayBody = await replay.json()
     const duplicate = await unlock(session, 'A', 'shallow')
     expect([first.status, replay.status, duplicate.status]).toEqual([201, 200, 200])
-    expect(await replay.json()).toMatchObject({ data: {
+    expect(replayBody).toMatchObject({ data: {
       created: false, alreadyUnlocked: false, sequenceNo: 8,
       points: { before: 5, cost: 1, after: 4 },
     } })

@@ -24,7 +24,7 @@ const stage8Tables = [
 ]
 
 describe('0008 prepilot derived metrics migration', () => {
-  it('keeps all Stage 8 tables and indexes under the current schema version 9', async () => {
+  it('keeps all Stage 8 tables and indexes under the current schema version 10', async () => {
     const created = await createWorkerRuntime()
     runtime = created.runtime
 
@@ -38,7 +38,7 @@ describe('0008 prepilot derived metrics migration', () => {
       "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name",
     ).all<{ name: string }>()
 
-    expect(schema?.value).toBe('9')
+    expect(schema?.value).toBe('10')
     expect(tables.results.map(({ name }) => name)).toEqual(
       expect.arrayContaining(stage8Tables),
     )

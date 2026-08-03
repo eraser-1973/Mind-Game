@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FormalRating } from '../types/formalGame'
-import type { Candidate } from '../types/game'
+import type { PublicCandidateProfile } from '../types/game'
 
 export function FormalCandidateDetail({
   candidate,
@@ -12,7 +12,7 @@ export function FormalCandidateDetail({
   onSubmit,
   children,
 }: {
-  candidate: Candidate
+  candidate: PublicCandidateProfile
   rating?: FormalRating
   pending?: boolean
   expired?: boolean

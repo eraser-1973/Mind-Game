@@ -225,6 +225,10 @@ describe('formal deep evidence and T3', () => {
 
   it('requires every deep candidate to have T3 before the T3 choice', async () => {
     const session = await createT1Complete()
+    // This fixture deliberately expands the published rule for one isolated
+    // scenario; Stage 10 seals published rules, so the test explicitly removes
+    // and restores that guard instead of weakening production immutability.
+    await db.prepare('DROP TRIGGER point_rules_published_no_update').run()
     await db.prepare('PRAGMA ignore_check_constraints = ON').run()
     await db.prepare('UPDATE game_runs SET points_remaining = 9, points_total = 9 WHERE session_id = ?')
       .bind(session.sessionId).run()
@@ -244,6 +248,11 @@ describe('formal deep evidence and T3', () => {
     expect(await incomplete.text()).toContain('T3_RATINGS_INCOMPLETE')
     await rate(session, 'C', 'T3', 58)
     expect((await choose(session, 'T3', 'A')).status).toBe(201)
+    await db.prepare("UPDATE point_rules SET total_points = 5 WHERE point_rule_version = 'points-5-v1'").run()
+    await db.prepare(`CREATE TRIGGER point_rules_published_no_update
+      BEFORE UPDATE ON point_rules
+      WHEN OLD.status = 'published'
+      BEGIN SELECT RAISE(ABORT, 'published point rules are immutable'); END`).run()
   })
 
   it('allows only one competing deep unlock to consume the last three points', async () => {

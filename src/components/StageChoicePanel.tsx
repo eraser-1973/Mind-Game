@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormalRatingStage } from '../types/formalGame'
-import type { Candidate, PublicCandidateId } from '../types/game'
+import type { PublicCandidateId, PublicCandidateProfile } from '../types/game'
 
 export function StageChoicePanel({
   candidates,
@@ -13,7 +13,7 @@ export function StageChoicePanel({
   submitHint,
   onSubmit,
 }: {
-  candidates: Candidate[]
+  candidates: PublicCandidateProfile[]
   pending: boolean
   disabled?: boolean
   error?: string | null

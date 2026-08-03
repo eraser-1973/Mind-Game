@@ -33,12 +33,12 @@ async function setupRunParent() {
 }
 
 describe('Stage 8 forward-only integrity guards', () => {
-  it('keeps its guards active under schema version 9 while rejecting NULL/version-key mismatches', async () => {
+  it('keeps its guards active under schema version 10 while rejecting NULL/version-key mismatches', async () => {
     const { db, sessionId, at } = await setupRunParent()
     const schema = await db.prepare(
       "SELECT value FROM app_metadata WHERE key='schema_version'",
     ).first<{ value: string }>()
-    expect(schema?.value).toBe('9')
+    expect(schema?.value).toBe('10')
 
     const insert = (normKey: string, reliabilityKey: string) =>
       db.prepare(`INSERT INTO scoring_runs (

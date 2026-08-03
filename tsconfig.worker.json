@@ -17,6 +17,9 @@
   "include": [
     "worker/**/*.ts",
     "worker-tests/**/*.ts",
+    "src/data/candidates.ts",
+    "src/types/game.ts",
+    "src/types/formalGame.ts",
     "vitest.worker.config.ts"
   ]
 }

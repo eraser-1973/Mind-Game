@@ -1,10 +1,10 @@
-import type { Candidate, PublicCandidateId } from '../types/game'
+import type { PublicCandidateId, PublicCandidateProfile } from '../types/game'
 
 export function FormalFinalDecisionPanel({
   candidates, selectedId, confidence, confidenceTouched, canSubmit, pending, error,
   onSelect, onConfidenceChange, onSubmit, onBack,
 }: {
-  candidates: Candidate[]
+  candidates: PublicCandidateProfile[]
   selectedId: PublicCandidateId | null
   confidence: number
   confidenceTouched: boolean

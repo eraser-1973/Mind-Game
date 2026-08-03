@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { candidateById } from '../data/candidates'
+import { useEffect, useMemo, useState } from 'react'
+import { getFormalMaterials } from '../api/formalMaterials'
 import { useFormalGameController } from '../hooks/useFormalGameController'
 import type {
   FormalEvidenceLevel,
@@ -7,11 +7,11 @@ import type {
   FormalRatingStage,
 } from '../types/formalGame'
 import type {
-  Candidate,
   CandidateRuntimeState,
   FormalSessionContext,
   NikoMessage,
   PublicCandidateId,
+  PublicCandidateProfile,
 } from '../types/game'
 import { createNikoFeedbackFromEvidence } from '../utils/nikoFeedback'
 import { CandidateList } from './CandidateList'
@@ -55,11 +55,13 @@ function runtimeFromSnapshot(snapshot: FormalGameSnapshot): Record<string, Candi
 export function FormalGameScreen({
   session,
   initialSnapshot,
+  initialMaterials,
   onSnapshot,
   onExit,
 }: {
   session: FormalSessionContext
   initialSnapshot?: FormalGameSnapshot | null
+  initialMaterials?: PublicCandidateProfile[]
   onSnapshot?: (snapshot: FormalGameSnapshot) => void
   onExit: () => void
 }) {
@@ -70,9 +72,48 @@ export function FormalGameScreen({
   const [finalCandidateId, setFinalCandidateId] = useState<PublicCandidateId | null>(null)
   const [finalConfidence, setFinalConfidence] = useState(0)
   const [finalConfidenceTouched, setFinalConfidenceTouched] = useState(false)
+  const [materials, setMaterials] = useState<PublicCandidateProfile[] | null>(initialMaterials ?? null)
+  const [materialError, setMaterialError] = useState<string | null>(null)
+  const [materialRequest, setMaterialRequest] = useState(0)
+
+  useEffect(() => {
+    if (initialMaterials) return
+    let active = true
+    setMaterialError(null)
+    void getFormalMaterials(session.sessionId).then((result) => {
+      if (active) setMaterials(result.candidates)
+    }).catch(() => {
+      if (active) setMaterialError('正式测评候选人资料暂时无法读取，请重试。')
+    })
+    return () => { active = false }
+  }, [initialMaterials, session.sessionId, materialRequest])
+
+  const candidateById = useMemo(() => Object.fromEntries(
+    (materials ?? []).map((candidate) => [candidate.id, candidate]),
+  ) as Record<string, PublicCandidateProfile>, [materials])
   const orderedCandidates = useMemo(() => session.candidateDisplayOrder
     .map((candidateId) => candidateById[candidateId])
-    .filter((candidate): candidate is Candidate => Boolean(candidate)), [session.candidateDisplayOrder])
+    .filter((candidate): candidate is PublicCandidateProfile => Boolean(candidate)),
+  [candidateById, session.candidateDisplayOrder])
+
+  if (!materials || orderedCandidates.length !== 5) {
+    return (
+      <main className="research-screen" data-testid={materialError ? 'formal-materials-error' : 'formal-materials-loading'}>
+        <section className="research-card">
+          <span className="eyebrow">FORMAL MATERIALS</span>
+          <h1>{materialError ? '候选人资料加载失败' : '正在读取会话材料'}</h1>
+          <p className="research-card__lead">{materialError ?? '正在读取本次会话固定版本的公开候选人资料。'}</p>
+          <div className="research-actions">
+            <button className="button button--ghost" onClick={onExit}>返回入口</button>
+            {materialError && (
+              <button className="button button--primary" data-testid="retry-formal-materials"
+                onClick={() => { setMaterials(null); setMaterialRequest((value) => value + 1) }}>重试</button>
+            )}
+          </div>
+        </section>
+      </main>
+    )
+  }
 
   if (!controller.snapshot) {
     return (

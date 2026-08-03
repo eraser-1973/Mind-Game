@@ -212,7 +212,7 @@ export type CandidateExperience = {
 export type ExpectedScoreRanges = Record<RatingStage, [number, number]>
 export type ExpectedEvidenceUpdate = 'up' | 'down' | 'stable'
 
-export type Candidate = {
+export type PublicCandidateProfile = {
   id: string
   name: string
   role: string
@@ -223,6 +223,10 @@ export type Candidate = {
   skills: string[]
   experiences: CandidateExperience[]
   initialImage: string
+  tags: string[]
+}
+
+export type Candidate = PublicCandidateProfile & {
   trueStrengths: string
   mainShortcomings: string
   shallowEvidence: Evidence[]
@@ -235,7 +239,6 @@ export type Candidate = {
   trueFit: number
   isToxic: boolean
   riskFlags: string[]
-  tags: string[]
 }
 
 export type RatingRecord = {

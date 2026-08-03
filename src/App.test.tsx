@@ -8,6 +8,7 @@ import { IdentityForm } from './components/IdentityForm'
 import { StartScreen } from './components/StartScreen'
 import { StateAssessmentScreen } from './components/StateAssessmentScreen'
 import type { DemographicData, FormalSessionContext, StateAssessmentData } from './types/game'
+import { candidates } from './data/candidates'
 import {
   FORMAL_SESSION_STORAGE_KEY,
   PENDING_CONSENT_KEY_STORAGE_KEY,
@@ -165,6 +166,11 @@ describe('App formal intake persistence', () => {
         candidateDisplayOrder: context.candidateDisplayOrder,
         initialOpenedCandidate: context.initialOpenedCandidate,
       }, 201)
+      if (path.endsWith('/materials')) return envelope({
+        sessionId: context.sessionId,
+        materialVersion: context.versions.material,
+        candidates: context.candidateDisplayOrder.map((id) => candidates.find((candidate) => candidate.id === id)),
+      })
       return envelope({
         created: true, sessionId: context.sessionId, currentStep: 'game_ready',
         submissionId: '44444444-4444-4444-8444-444444444444', itemCount: 5,
@@ -183,6 +189,7 @@ describe('App formal intake persistence', () => {
     expect(paths).toEqual([
       '/api/sessions', '/api/consent', '/api/demographics', '/api/questionnaires',
       `/api/sessions/${context.sessionId}/start`,
+      `/api/sessions/${context.sessionId}/materials`,
     ])
     expect(renderer!.root.findAllByType(GameScreen)).toHaveLength(1)
     const stored = localStorage.getItem(FORMAL_SESSION_STORAGE_KEY) ?? ''
@@ -294,19 +301,25 @@ describe('App formal refresh recovery', () => {
 
   it('restores a playing session from the authoritative server snapshot without restarting it', async () => {
     localStorage.setItem(FORMAL_SESSION_STORAGE_KEY, JSON.stringify({ ...context, currentStep: 'playing' }))
-    globalThis.fetch = vi.fn(async () => envelope({
-      session: { ...context, currentStep: 'playing', mode: 'formal' },
-      consent: null,
-      demographics: null,
-      preTask: null,
-      game: gameSnapshot,
-    }))
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/materials')
+      ? envelope({
+          sessionId: context.sessionId,
+          materialVersion: context.versions.material,
+          candidates: context.candidateDisplayOrder.map((id) => candidates.find((candidate) => candidate.id === id)),
+        })
+      : envelope({
+          session: { ...context, currentStep: 'playing', mode: 'formal' },
+          consent: null,
+          demographics: null,
+          preTask: null,
+          game: gameSnapshot,
+        }))
     await renderApp()
     const game = renderer!.root.findByType(GameScreen)
     expect(game.props.formalGameSnapshot).toEqual({
       ...gameSnapshot, sunkCost: null, finalDecision: null,
     })
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       `/api/sessions/${context.sessionId}/resume`,
       { method: 'GET', credentials: 'include' },

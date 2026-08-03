@@ -4,6 +4,7 @@ import {
   getAdminSession,
   loginAdmin,
   logoutAdmin,
+  adminConfigurationApi,
 } from './adminApi'
 import { readAdminCsrfToken } from './adminCsrf'
 
@@ -111,5 +112,43 @@ describe('administrator browser API boundary', () => {
       { path: '/api/admin/session', csrf: null },
       { path: '/api/admin/logout', csrf: 'csrf-safe-value' },
     ])
+  })
+
+  it('uses CSRF and a fresh UUID idempotency key for configuration writes without browser storage', async () => {
+    let captured: RequestInit | undefined
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      captured = init
+      return response({ version: 'material-test', status: 'draft' }, 201)
+    })
+    await adminConfigurationApi.cloneMaterial({
+      version: 'material-test', displayName: '测试', cloneFromVersion: 'material-1.0.0',
+    })
+    const headers = new Headers(captured?.headers)
+    expect(headers.get('X-CSRF-Token')).toBe('csrf-safe-value')
+    expect(headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(captured).toMatchObject({ method: 'POST', credentials: 'include' })
+    expect(localStorage.dump()).toBe('[]')
+    expect(sessionStorage.dump()).toBe('[]')
+  })
+
+  it('repairs CSRF once and reuses the same idempotency key for the configuration retry', async () => {
+    const calls: Array<{ path: string; key: string | null }> = []
+    let writeAttempts = 0
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input)
+      calls.push({ path, key: new Headers(init?.headers).get('Idempotency-Key') })
+      if (path === '/api/admin/session') return response({ authenticated: true })
+      writeAttempts += 1
+      if (writeAttempts === 1) return response({ code: 'ADMIN_CSRF_REJECTED', message: 'Rejected.' }, 403)
+      return response({ version: 'material-retry', status: 'draft' }, 201)
+    })
+    await adminConfigurationApi.cloneMaterial({
+      version: 'material-retry', displayName: '重试', cloneFromVersion: 'material-1.0.0',
+    })
+    expect(calls.map(({ path }) => path)).toEqual([
+      '/api/admin/config/material-sets', '/api/admin/session', '/api/admin/config/material-sets',
+    ])
+    expect(calls[0].key).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(calls[2].key).toBe(calls[0].key)
   })
 })

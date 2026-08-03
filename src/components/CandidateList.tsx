@@ -1,10 +1,10 @@
 import type {
-  Candidate,
+  PublicCandidateProfile,
   CandidateRuntimeState,
 } from '../types/game'
 
 type Props = {
-  candidates: Candidate[]
+  candidates: PublicCandidateProfile[]
   runtime: Record<string, CandidateRuntimeState>
   selectedId: string
   onSelect: (id: string) => void

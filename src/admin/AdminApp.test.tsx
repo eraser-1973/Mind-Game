@@ -127,6 +127,18 @@ describe('isolated administrator application', () => {
         }],
         nextCursor: path.includes('cursor=') ? null : 'next-safe-cursor',
       })
+      if (path === '/api/admin/config/material-sets') return envelope({ items: [] })
+      if (path === '/api/admin/config/point-rules') return envelope({ items: [] })
+      if (path === '/api/admin/config/sunk-cost-rules') return envelope({ items: [] })
+      if (path === '/api/admin/config/configuration-sets') return envelope({ items: [{
+        configSetId: 'config-2026-07-v1', displayName: '当前正式预实验配置',
+        sourceConfigSetId: null, status: 'published', active: true, revision: 1,
+        validationStatus: 'valid', validationReport: { errors: [], warnings: [] },
+        fingerprint: 'a'.repeat(64), taskVersion: 'task-1.0.0', materialVersion: 'material-1.0.0',
+        pointRuleVersion: 'points-5-v1', sunkCostRuleVersion: 'sunk-1.0.0',
+        scoringVersion: 'RDI-2.0-prepilot', benchmarkVersion: 'benchmark-1.0.0',
+        normVersion: null, publishedAt: '2026-08-02T00:00:00.000Z', activatedAt: '2026-08-02T00:00:00.000Z',
+      }] })
       return envelope({ authenticated: false, loggedOut: true })
     })
     await renderAdmin()
@@ -135,7 +147,7 @@ describe('isolated administrator application', () => {
     const serialized = JSON.stringify(renderer!.toJSON())
     expect(serialized).toContain('管理员控制台')
     expect(serialized).toContain('安全认证基础已启用')
-    expect(serialized).not.toMatch(/姓名|学号|手机号|评分|问卷|导出|删除数据/)
+    expect(serialized).not.toMatch(/姓名|学号|手机号|问卷|导出|删除数据/)
 
     await act(async () => dashboard.props.onLoadMore())
     expect(paths.some((path) => path.includes('cursor=next-safe-cursor'))).toBe(true)

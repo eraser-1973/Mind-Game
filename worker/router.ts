@@ -23,6 +23,7 @@ import {
 } from './routes/sunkCostFinal'
 import { handleFormalSessionEnd } from './routes/formalCompletion'
 import { handleAdminRequest } from './routes/admin'
+import { handleFormalMaterials } from './routes/formalMaterials'
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
@@ -88,6 +89,11 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
   const startMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/start$/)
   if (startMatch) {
     return handleStartFormalGame(request, env, requestId, startMatch[1])
+  }
+
+  const materialsMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/materials$/)
+  if (materialsMatch) {
+    return handleFormalMaterials(request, env, requestId, materialsMatch[1])
   }
 
   const resumeMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/resume$/)

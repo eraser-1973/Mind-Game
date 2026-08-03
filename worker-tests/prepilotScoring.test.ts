@@ -78,6 +78,12 @@ async function insertEvidence(options: {
         options.sequenceNo, serverAt),
   ]
   if (options.itemMaterialVersion && options.itemMaterialVersion !== 'material-1.0.0') {
+    statements.push(db.prepare(`INSERT OR IGNORE INTO material_sets (
+      material_version,display_name,status,source_material_version,revision_no,
+      validation_status,validation_report_json,created_at,updated_at
+    ) VALUES (?,'Fault-injection material','draft','material-1.0.0',1,
+      'not_validated',json('{"errors":[],"warnings":[]}'),?,?)`)
+      .bind(options.itemMaterialVersion, serverAt, serverAt))
     for (const evidenceId of evidenceIds) {
       statements.push(db.prepare(`INSERT INTO candidate_evidence_items (
         material_version,evidence_id,candidate_id,evidence_level,item_order,
@@ -705,6 +711,11 @@ describe('prepilot scoring persistence', () => {
 
   it('fingerprints distinct evidence-item, configuration, and point-rule failures', async () => {
     const fixture = await seedCompletedSession()
+    // Fault-injection intentionally corrupts otherwise immutable published
+    // configuration. Remove only the production guards inside this isolated
+    // test database; migration tests separately assert those guards exist.
+    await db.prepare('DROP TRIGGER configuration_sets_published_content_no_update').run()
+    await db.prepare('DROP TRIGGER point_rules_published_no_update').run()
     const event = await db.prepare(`SELECT event_id FROM evidence_events
       WHERE session_id=? ORDER BY sequence_no LIMIT 1`).bind(fixture.sessionId)
       .first<{ event_id: string }>()

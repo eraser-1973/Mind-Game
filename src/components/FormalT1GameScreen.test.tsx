@@ -2,6 +2,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormalGameSnapshot } from '../types/formalGame'
 import type { FormalSessionContext } from '../types/game'
+import { candidates } from '../data/candidates'
 
 const api = vi.hoisted(() => ({
   start: vi.fn(),
@@ -83,7 +84,7 @@ afterEach(() => {
 
 describe('FormalT1GameScreen server state behavior', () => {
   it('uses the server candidate order and never calls start for a restored snapshot', () => {
-    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     const detail = renderer.root.findByType(FormalCandidateDetail)
     expect(detail.props.candidate.id).toBe('B')
     expect(api.start).not.toHaveBeenCalled()
@@ -96,7 +97,7 @@ describe('FormalT1GameScreen server state behavior', () => {
       serverSubmittedAt: '2026-08-01T00:01:00.000Z', ratedCandidateCount: 1,
       requiredCandidateCount: 5, allStageRated: false, allT1Rated: false,
     })
-    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     await act(async () => renderer!.root.findByType(FormalCandidateDetail).props.onSubmit(73))
     expect(renderer.root.findByType(FormalCandidateDetail).props.rating).toMatchObject({ ratingValue: 73, sealed: true })
     expect(api.rate).toHaveBeenCalledTimes(1)
@@ -109,7 +110,7 @@ describe('FormalT1GameScreen server state behavior', () => {
       serverSubmittedAt: '2026-08-01T00:01:00.000Z', ratedCandidateCount: 1,
       requiredCandidateCount: 5, allStageRated: false, allT1Rated: false,
     })
-    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={baseSnapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     await act(async () => renderer!.root.findByType(FormalCandidateDetail).props.onSubmit(60))
     expect(renderer.root.findByType(FormalCandidateDetail).props.rating).toBeUndefined()
     await act(async () => renderer!.root.findByType(FormalCandidateDetail).props.onSubmit(60))
@@ -130,7 +131,7 @@ describe('FormalT1GameScreen server state behavior', () => {
       confidence: 0, sealed: true, currentStage: 'T1_COMPLETE', stageStatus: 'T1_COMPLETE', sequenceNo: 7,
       serverSubmittedAt: '2026-08-01T00:05:00.000Z',
     })
-    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, ratings, lastSequenceNo: 6 }} onExit={vi.fn()} />)
+    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, ratings, lastSequenceNo: 6 }} initialMaterials={candidates} onExit={vi.fn()} />)
     expect(renderer.root.findAllByType(StageChoicePanel)).toHaveLength(1)
     await act(async () => renderer!.root.findByType(StageChoicePanel).props.onSubmit('D', 0))
     expect(renderer.root.findAllByType(FormalEvidencePanel)).toHaveLength(1)
@@ -138,7 +139,7 @@ describe('FormalT1GameScreen server state behavior', () => {
   })
 
   it('locks all submissions on an expired server snapshot', () => {
-    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, expired: true, remainingSec: 0 }} onExit={vi.fn()} />)
+    renderer = create(<FormalT1GameScreen session={context} initialSnapshot={{ ...baseSnapshot, expired: true, remainingSec: 0 }} initialMaterials={candidates} onExit={vi.fn()} />)
     expect(renderer.root.findAllByProps({ 'data-testid': 'formal-timeout-saving' })).toHaveLength(1)
     expect(renderer.root.findAllByType(FormalCandidateDetail)).toHaveLength(0)
   })

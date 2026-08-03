@@ -2,6 +2,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormalEvidenceUnlock, FormalGameSnapshot } from '../types/formalGame'
 import type { FormalSessionContext } from '../types/game'
+import { candidates } from '../data/candidates'
 
 const api = vi.hoisted(() => ({
   start: vi.fn(),
@@ -117,7 +118,7 @@ afterEach(() => {
 
 describe('FormalGameScreen Stage 5 server state', () => {
   it('shows shallow verification at T1_COMPLETE without rendering locked local evidence', () => {
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalGameScreen session={context} initialSnapshot={baseSnapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     const panel = renderer.root.findByType(FormalEvidencePanel)
     expect(panel.props.canUnlockShallow).toBe(true)
     expect(panel.props.shallowUnlock).toBeUndefined()
@@ -132,7 +133,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
       currentStage: 'T2', stageStatus: 'T2_ACTIVE',
       points: { ...shallowB.points, total: 5 },
     })
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={baseSnapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalGameScreen session={context} initialSnapshot={baseSnapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     await act(async () => renderer!.root.findByType(FormalEvidencePanel).props.onUnlock('shallow'))
     let panel = renderer.root.findByType(FormalEvidencePanel)
     expect(panel.props.shallowUnlock).toBeUndefined()
@@ -159,7 +160,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
       ratedCandidateCount: 1, requiredCandidateCount: 2,
       allStageRated: false, allT1Rated: true,
     })
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={snapshot} onExit={vi.fn()} />)
+    renderer = create(<FormalGameScreen session={context} initialSnapshot={snapshot} initialMaterials={candidates} onExit={vi.fn()} />)
     const rating = renderer.root.findByType(FormalRatingPanel)
     expect(rating.props.stage).toBe('T2')
     await act(async () => rating.props.onSubmit(75))
@@ -175,7 +176,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
       evidenceIdsSeen: ['B-t2-1', 'B-t2-2'], sealed: true as const,
       sequenceNo: 9, serverSubmittedAt: '2026-08-01T00:04:00.000Z',
     }
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={{
+    renderer = create(<FormalGameScreen session={context} initialMaterials={candidates} initialSnapshot={{
       ...baseSnapshot, currentStage: 'T2', stageStatus: 'T2_ACTIVE',
       points: { total: 5, remaining: 4 }, evidenceUnlocks: [shallowB],
       ratings: [...t1Ratings, t2Rating], lastSequenceNo: 9,
@@ -186,7 +187,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
   })
 
   it('opens the Stage 6 final decision after T3 is sealed', () => {
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={{
+    renderer = create(<FormalGameScreen session={context} initialMaterials={candidates} initialSnapshot={{
       ...baseSnapshot, currentStage: 'T3', stageStatus: 'T3_COMPLETE',
       points: { total: 5, remaining: 1 }, lastSequenceNo: 13,
     }} onExit={vi.fn()} />)
@@ -201,7 +202,7 @@ describe('FormalGameScreen Stage 5 server state', () => {
       evidenceIdsSeen: ['B-t2-1', 'B-t2-2'], sealed: true as const,
       sequenceNo: 9, serverSubmittedAt: '2026-08-01T00:04:00.000Z',
     }
-    renderer = create(<FormalGameScreen session={context} initialSnapshot={{
+    renderer = create(<FormalGameScreen session={context} initialMaterials={candidates} initialSnapshot={{
       ...baseSnapshot, currentStage: 'T2', stageStatus: 'T2_ACTIVE',
       expired: true, remainingSec: 0, points: { total: 5, remaining: 4 },
       evidenceUnlocks: [shallowB], ratings: [...t1Ratings, t2Rating], lastSequenceNo: 9,

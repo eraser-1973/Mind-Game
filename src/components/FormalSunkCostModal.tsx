@@ -1,4 +1,4 @@
-import type { Candidate } from '../types/game'
+import type { PublicCandidateProfile } from '../types/game'
 
 export function FormalSunkCostModal({
   candidate,
@@ -7,7 +7,7 @@ export function FormalSunkCostModal({
   error,
   onChoose,
 }: {
-  candidate: Candidate
+  candidate: PublicCandidateProfile
   pointsInvested: number
   pending: boolean
   error: string | null

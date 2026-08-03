@@ -2,6 +2,9 @@ import type {
   AdminAuditPage,
   AdminLoginData,
   AdminSessionData,
+  AdminConfigurationDetail,
+  AdminMaterialDetail,
+  AdminRuleDetail,
 } from './adminTypes'
 import { readAdminCsrfToken } from './adminCsrf'
 
@@ -98,4 +101,62 @@ export async function logoutAdmin(): Promise<{ authenticated: false; loggedOut: 
     await getAdminSession()
     return sendLogout()
   }
+}
+
+async function sendConfigWrite<T>(path: string, method: 'POST' | 'PUT', body: unknown, idempotencyKey: string): Promise<T> {
+  const token = readAdminCsrfToken()
+  if (!token) throw new AdminApiError(403, 'ADMIN_CSRF_REJECTED', '管理员安全令牌缺失。', '')
+  return parseResponse(await fetch(path, {
+    method,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': token,
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(body),
+  }))
+}
+
+async function configWrite<T>(path: string, method: 'POST' | 'PUT', body: unknown): Promise<T> {
+  const idempotencyKey = crypto.randomUUID()
+  try {
+    return await sendConfigWrite<T>(path, method, body, idempotencyKey)
+  } catch (error) {
+    if (!(error instanceof AdminApiError) || error.code !== 'ADMIN_CSRF_REJECTED') throw error
+    await getAdminSession()
+    return sendConfigWrite<T>(path, method, body, idempotencyKey)
+  }
+}
+
+async function configGet<T>(path: string): Promise<T> {
+  return parseResponse(await fetch(path, { method: 'GET', credentials: 'include' }))
+}
+
+export const adminConfigurationApi = {
+  listMaterials: () => configGet<{ items: Array<Pick<AdminMaterialDetail, 'version' | 'displayName' | 'status' | 'revision' | 'validationStatus' | 'publishedAt'> & { usedByActiveConfig: boolean }> }>('/api/admin/config/material-sets'),
+  getMaterial: (version: string) => configGet<AdminMaterialDetail>(`/api/admin/config/material-sets/${encodeURIComponent(version)}`),
+  cloneMaterial: (body: { version: string; displayName: string; cloneFromVersion: string }) => configWrite('/api/admin/config/material-sets', 'POST', body),
+  updateMaterial: (version: string, body: { expectedRevision: number; displayName: string; document: { profiles: AdminMaterialDetail['profiles']; evidence: AdminMaterialDetail['evidence'] } }) => configWrite<AdminMaterialDetail>(`/api/admin/config/material-sets/${encodeURIComponent(version)}`, 'PUT', body),
+  validateMaterial: (version: string) => configWrite<{ errors: unknown[]; warnings: unknown[] }>(`/api/admin/config/material-sets/${encodeURIComponent(version)}/validate`, 'POST', {}),
+  publishMaterial: (version: string) => configWrite(`/api/admin/config/material-sets/${encodeURIComponent(version)}/publish`, 'POST', {}),
+  listPointRules: () => configGet<{ items: AdminRuleDetail[] }>('/api/admin/config/point-rules'),
+  listSunkRules: () => configGet<{ items: AdminRuleDetail[] }>('/api/admin/config/sunk-cost-rules'),
+  getPointRule: (version: string) => configGet<AdminRuleDetail>(`/api/admin/config/point-rules/${encodeURIComponent(version)}`),
+  getSunkRule: (version: string) => configGet<AdminRuleDetail>(`/api/admin/config/sunk-cost-rules/${encodeURIComponent(version)}`),
+  clonePointRule: (body: { version: string; displayName: string; cloneFromVersion: string }) => configWrite('/api/admin/config/point-rules', 'POST', body),
+  cloneSunkRule: (body: { version: string; displayName: string; cloneFromVersion: string }) => configWrite('/api/admin/config/sunk-cost-rules', 'POST', body),
+  updatePointRule: (version: string, body: unknown) => configWrite(`/api/admin/config/point-rules/${encodeURIComponent(version)}`, 'PUT', body),
+  updateSunkRule: (version: string, body: unknown) => configWrite(`/api/admin/config/sunk-cost-rules/${encodeURIComponent(version)}`, 'PUT', body),
+  validatePointRule: (version: string) => configWrite(`/api/admin/config/point-rules/${encodeURIComponent(version)}/validate`, 'POST', {}),
+  validateSunkRule: (version: string) => configWrite(`/api/admin/config/sunk-cost-rules/${encodeURIComponent(version)}/validate`, 'POST', {}),
+  publishPointRule: (version: string) => configWrite(`/api/admin/config/point-rules/${encodeURIComponent(version)}/publish`, 'POST', {}),
+  publishSunkRule: (version: string) => configWrite(`/api/admin/config/sunk-cost-rules/${encodeURIComponent(version)}/publish`, 'POST', {}),
+  listConfigurations: () => configGet<{ items: AdminConfigurationDetail[] }>('/api/admin/config/configuration-sets'),
+  getConfiguration: (id: string) => configGet<AdminConfigurationDetail>(`/api/admin/config/configuration-sets/${encodeURIComponent(id)}`),
+  cloneConfiguration: (body: { configSetId: string; displayName: string; cloneFromConfigSetId: string }) => configWrite('/api/admin/config/configuration-sets', 'POST', body),
+  updateConfiguration: (id: string, body: unknown) => configWrite(`/api/admin/config/configuration-sets/${encodeURIComponent(id)}`, 'PUT', body),
+  validateConfiguration: (id: string) => configWrite(`/api/admin/config/configuration-sets/${encodeURIComponent(id)}/validate`, 'POST', {}),
+  publishConfiguration: (id: string) => configWrite(`/api/admin/config/configuration-sets/${encodeURIComponent(id)}/publish`, 'POST', {}),
+  activateConfiguration: (id: string) => configWrite(`/api/admin/config/configuration-sets/${encodeURIComponent(id)}/activate`, 'POST', { confirmConfigSetId: id }),
 }

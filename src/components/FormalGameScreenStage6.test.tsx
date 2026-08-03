@@ -2,6 +2,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormalGameSnapshot } from '../types/formalGame'
 import type { FormalSessionContext } from '../types/game'
+import { candidates } from '../data/candidates'
 
 const api = vi.hoisted(() => ({
   show: vi.fn(), choice: vi.fn(), final: vi.fn(), timeout: vi.fn(),
@@ -107,7 +108,7 @@ describe('Formal Stage 6 UI', () => {
       pointsInvestedBefore: 2, shownAt: '2026-08-01T00:10:00.000Z', choice: null,
       choiceSubmittedAt: null, pointsAfterChoice: null,
     })
-    await act(async () => { renderer = create(<FormalGameScreen session={session} initialSnapshot={snapshot} onExit={vi.fn()} />) })
+    await act(async () => { renderer = create(<FormalGameScreen session={session} initialSnapshot={snapshot} initialMaterials={candidates} onExit={vi.fn()} />) })
     const modal = renderer!.root.findByType(FormalSunkCostModal)
     const buttons = modal.findAllByType('button')
     expect(buttons).toHaveLength(3)
@@ -122,7 +123,7 @@ describe('Formal Stage 6 UI', () => {
       serverSubmittedAt: '2026-08-01T00:11:00.000Z', sequenceNo: 10,
       remainingSec: 240, pointsRemaining: 2, currentStep: 'post_task',
     })
-    await act(async () => { renderer = create(<FormalGameScreen session={session} initialSnapshot={snapshot} onExit={vi.fn()} />) })
+    await act(async () => { renderer = create(<FormalGameScreen session={session} initialSnapshot={snapshot} initialMaterials={candidates} onExit={vi.fn()} />) })
     const panel = renderer!.root.findByType(FormalFinalDecisionPanel)
     expect(panel.props.title).toBe('锁定最终录用人选')
     expect(panel.props.canSubmit).toBe(false)

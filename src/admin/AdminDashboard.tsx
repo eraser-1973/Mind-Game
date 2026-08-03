@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { AdminAuditLogPanel } from './AdminAuditLogPanel'
+import { AdminConfigurationConsole } from './AdminConfigurationConsole'
 import type { AdminAuditItem, AdminSessionData } from './adminTypes'
 
 export function AdminDashboard({
@@ -16,6 +18,7 @@ export function AdminDashboard({
   onLoadMore: () => Promise<void>
   onLogout: () => Promise<void>
 }) {
+  const [section, setSection] = useState<'configuration' | 'audit'>('configuration')
   return (
     <main className="admin-shell admin-shell--dashboard" data-testid="admin-dashboard">
       <header className="admin-console-header">
@@ -32,13 +35,16 @@ export function AdminDashboard({
         <div><span>当前管理员</span><strong>{session.admin.username}</strong></div>
         <div><span>绝对过期时间</span><strong>{new Date(session.session.absoluteExpiresAt).toLocaleString('zh-CN')}</strong></div>
       </section>
-      <AdminAuditLogPanel
+      <nav className="admin-dashboard-nav" aria-label="管理员功能">
+        <button aria-pressed={section === 'configuration'} onClick={() => setSection('configuration')}>实验配置</button>
+        <button aria-pressed={section === 'audit'} onClick={() => setSection('audit')}>审计日志</button>
+      </nav>
+      {section === 'configuration' ? <AdminConfigurationConsole /> : <AdminAuditLogPanel
         items={audits}
         hasMore={nextCursor !== null}
         loading={loadingMore}
         onLoadMore={onLoadMore}
-      />
-      <p className="admin-stage-note">后续管理能力将在完成各自安全评审后开放。</p>
+      />}
     </main>
   )
 }

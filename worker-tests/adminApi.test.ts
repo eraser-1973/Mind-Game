@@ -140,8 +140,8 @@ describe('administrator API request validation and security envelopes', () => {
 
   it('uses an identical generic error for a wrong password and an unknown username and records safe audits', async () => {
     const wrong = await login(username, otherPassword)
-    const missing = await login('missing.admin', otherPassword)
     const wrongBody = await wrong.json() as Record<string, unknown>
+    const missing = await login('missing.admin', otherPassword)
     const missingBody = await missing.json() as Record<string, unknown>
 
     expect(wrong.status).toBe(401)

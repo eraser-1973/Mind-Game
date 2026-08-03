@@ -9,6 +9,24 @@ export const ADMIN_AUDIT_ACTIONS = [
   'admin_session_idle_expired',
   'admin_session_absolute_expired',
   'admin_audit_logs_viewed',
+  'material_set_created',
+  'material_set_updated',
+  'material_set_validated',
+  'material_set_published',
+  'point_rule_created',
+  'point_rule_updated',
+  'point_rule_validated',
+  'point_rule_published',
+  'sunk_cost_rule_created',
+  'sunk_cost_rule_updated',
+  'sunk_cost_rule_validated',
+  'sunk_cost_rule_published',
+  'configuration_set_created',
+  'configuration_set_updated',
+  'configuration_set_validated',
+  'configuration_set_published',
+  'configuration_set_activated',
+  'configuration_set_rollback_activated',
 ] as const
 
 export type AdminAuditAction = typeof ADMIN_AUDIT_ACTIONS[number]
@@ -24,6 +42,14 @@ const SAFE_METADATA_KEYS = new Set([
   'limit',
   'action',
   'outcome',
+  'version',
+  'revision',
+  'validationStatus',
+  'previousActiveConfig',
+  'newActiveConfig',
+  'contentFingerprint',
+  'warningCount',
+  'errorCount',
 ])
 
 export function safeAdminAuditMetadata(

@@ -35,7 +35,7 @@ async function insertAdmin(db: D1Database, suffix = '1') {
 }
 
 describe('0011 administrator authentication and audit migration', () => {
-  it('creates the security schema, exact published policy, and schema version 9 without a default administrator', async () => {
+  it('keeps the security schema and policy intact under schema version 10 without a default administrator', async () => {
     const created = await createWorkerRuntime()
     runtime = created.runtime
 
@@ -59,10 +59,11 @@ describe('0011 administrator authentication and audit migration', () => {
       'admin_audit_logs',
       'admin_auth_policies',
       'admin_login_attempts',
+      'admin_operation_receipts',
       'admin_sessions',
       'admin_users',
     ])
-    expect(metadata?.value).toBe('9')
+    expect(metadata?.value).toBe('10')
     expect(policy).toMatchObject({
       auth_policy_version: 'admin-auth-1.0.0',
       password_algorithm: 'PBKDF2',
