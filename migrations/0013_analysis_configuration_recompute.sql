@@ -59,6 +59,8 @@ ALTER TABLE reliability_parameters ADD COLUMN validated_at TEXT;
 -- backfill; all subsequent published changes remain blocked below.
 DROP TRIGGER scoring_definitions_published_immutable;
 DROP TRIGGER benchmark_sets_published_immutable;
+DROP TRIGGER benchmark_sets_current_baseline_insert_guard;
+DROP TRIGGER benchmark_sets_current_baseline_update_guard;
 
 UPDATE scoring_definitions SET
   revision_no = 1,
@@ -74,8 +76,7 @@ UPDATE benchmark_sets SET
   revision_no = 1,
   validation_status = 'valid',
   validation_report_json = json('{"errors":[],"warnings":[{"code":"PROVISIONAL_BASELINE","path":"sourceType"}]}'),
-  updated_at = created_at,
-  validated_at = created_at
+  updated_at = created_at
 WHERE revision_no IS NULL;
 
 UPDATE norm_sets SET
@@ -333,15 +334,27 @@ CREATE TRIGGER derived_metric_standard_scores_no_update
 BEFORE UPDATE ON derived_metric_standard_scores
 BEGIN SELECT RAISE(ABORT, 'standard score values are immutable'); END;
 
-CREATE TRIGGER analysis_scoring_definitions_published_no_update
+CREATE TRIGGER scoring_definitions_published_immutable
 BEFORE UPDATE ON scoring_definitions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published scoring definitions are immutable'); END;
 
-CREATE TRIGGER analysis_benchmark_sets_published_no_update
+CREATE TRIGGER benchmark_sets_published_immutable
 BEFORE UPDATE ON benchmark_sets
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published benchmark sets are immutable'); END;
+
+-- These guards are deliberately created after the generic published guard so
+-- their more specific error remains observable for current-app baselines.
+CREATE TRIGGER benchmark_sets_current_baseline_insert_guard
+BEFORE INSERT ON benchmark_sets
+WHEN NEW.source_type = 'current_app_baseline' AND NEW.is_provisional <> 1
+BEGIN SELECT RAISE(ABORT, 'current-app baselines must remain provisional'); END;
+
+CREATE TRIGGER benchmark_sets_current_baseline_update_guard
+BEFORE UPDATE OF source_type, is_provisional ON benchmark_sets
+WHEN NEW.source_type = 'current_app_baseline' AND NEW.is_provisional <> 1
+BEGIN SELECT RAISE(ABORT, 'current-app baselines must remain provisional'); END;
 
 CREATE TRIGGER analysis_norm_sets_published_no_update
 BEFORE UPDATE ON norm_sets

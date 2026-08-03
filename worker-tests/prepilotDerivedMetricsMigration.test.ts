@@ -25,7 +25,7 @@ const stage8Tables = [
 
 describe('0008 prepilot derived metrics migration', () => {
   it('keeps all Stage 8 tables and indexes under the current schema version 10', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
 
     const schema = await created.db.prepare(
@@ -56,7 +56,7 @@ describe('0008 prepilot derived metrics migration', () => {
   })
 
   it('publishes the disabled prepilot definition and provisional benchmark', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
 
     const definition = await created.db.prepare(`SELECT display_name,formula_family,
@@ -118,7 +118,7 @@ describe('0008 prepilot derived metrics migration', () => {
   })
 
   it('seeds exact A-E values and directions without invented uncertainty', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const values = await created.db.prepare(`SELECT candidate_id,benchmark_value,
       benchmark_sd,direction,include_in_core_eac,source_note
@@ -144,7 +144,7 @@ describe('0008 prepilot derived metrics migration', () => {
   })
 
   it('does not seed expert, norm metric, or reliability values', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
 
     const counts = await created.db.prepare(`SELECT
@@ -169,7 +169,7 @@ describe('0008 prepilot derived metrics migration', () => {
   })
 
   it('enforces run uniqueness, one current run, JSON, and append-only facts', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const participantId = crypto.randomUUID()
     const sessionId = crypto.randomUUID()

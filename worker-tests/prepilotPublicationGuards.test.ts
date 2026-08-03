@@ -6,7 +6,7 @@ let runtime: Miniflare
 let db: D1Database
 
 beforeEach(async () => {
-  const created = await createWorkerRuntime()
+  const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
   runtime = created.runtime
   db = created.db
 })

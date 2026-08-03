@@ -18,7 +18,7 @@ afterEach(async () => {
 
 describe('0012 versioned material configuration migration', () => {
   it('creates the Stage 10A schema, seeds the current configuration, and advances schema version', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const schema = await created.db.prepare(
       "SELECT value FROM app_metadata WHERE key = 'schema_version'",
@@ -46,7 +46,7 @@ describe('0012 versioned material configuration migration', () => {
   })
 
   it('migrates exactly the current public profile fields and excludes hidden answer columns', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const profiles = await created.db.prepare(`SELECT candidate_id,display_order,name,
       role,school,visible_halo_json,resume_summary,education,skills_json,
@@ -83,7 +83,7 @@ describe('0012 versioned material configuration migration', () => {
   })
 
   it('backfills stable fingerprints for the initial published components and configuration', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const profiles = candidates.map((candidate, index) => ({
       candidateId: candidate.id,
@@ -128,7 +128,7 @@ describe('0012 versioned material configuration migration', () => {
   })
 
   it('seals published component content at the database boundary', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     await expect(created.db.prepare(`UPDATE candidate_material_profiles SET name='changed'
       WHERE material_version='material-1.0.0' AND candidate_id='A'`).run()).rejects.toThrow()

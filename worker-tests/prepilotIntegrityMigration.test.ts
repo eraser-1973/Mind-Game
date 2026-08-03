@@ -10,7 +10,7 @@ afterEach(async () => {
 })
 
 async function setupRunParent() {
-  const created = await createWorkerRuntime()
+  const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
   runtime = created.runtime
   const at = '2026-08-02T00:00:00.000Z'
   const participantId = crypto.randomUUID()
@@ -58,7 +58,7 @@ describe('Stage 8 forward-only integrity guards', () => {
   })
 
   it('prevents deleting or adding values under a published benchmark version', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const at = '2026-08-02T00:00:00.000Z'
 
