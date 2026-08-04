@@ -21,7 +21,7 @@ describe('0013 analysis parameters and recomputation migration', () => {
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all<{ name: string }>()
 
-    expect(schema?.value).toBe('11')
+    expect(schema?.value).toBe('12')
     expect(tables.results.map(({ name }) => name)).toEqual(expect.arrayContaining([
       'benchmark_candidate_policies',
       'analysis_validation_runs',

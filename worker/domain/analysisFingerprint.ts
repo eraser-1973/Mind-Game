@@ -1,4 +1,36 @@
 import { fingerprintValue } from './configurationFingerprint'
+import { analysisCandidateIds, type ExpertBenchmarkDocument } from './analysisConfiguration'
+
+/**
+ * Hashes only the facts that define an expert benchmark. Lifecycle metadata,
+ * revision numbers and administrator/request identity intentionally stay out
+ * so equal sealed matrices have equal digests.
+ */
+export function fingerprintExpertBenchmarkContent(
+  document: Pick<ExpertBenchmarkDocument, 'displayName' | 'ratedAt' | 'candidatePolicies' | 'experts'>,
+): Promise<string> {
+  return fingerprintValue({
+    algorithm: 'expert-benchmark-content-v1',
+    displayName: document.displayName,
+    ratedAt: document.ratedAt,
+    candidatePolicies: [...document.candidatePolicies]
+      .map((policy) => ({
+        candidateId: policy.candidateId,
+        direction: policy.direction,
+        includeInCoreEac: policy.includeInCoreEac,
+      }))
+      .sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
+    experts: [...document.experts]
+      .map((expert) => ({
+        expertCode: expert.expertCode,
+        scores: analysisCandidateIds.map((candidateId) => ({
+          candidateId,
+          score: expert.scores[candidateId],
+        })),
+      }))
+      .sort((left, right) => left.expertCode.localeCompare(right.expertCode)),
+  })
+}
 
 export type FormalAnalysisFingerprintInput = {
   sourceFacts: Record<string, unknown>

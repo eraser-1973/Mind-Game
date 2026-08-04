@@ -152,7 +152,7 @@ export function validateExpertBenchmarkDocument(value: unknown): AnalysisValidat
       if (!code.valid || codes.has(expert.expertCode)) {
         errors.push(issue('EXPERT_CODE_INVALID', `${path}.expertCode`, 'Use a unique anonymous internal expert code.'))
       } else if (code.shouldWarn) {
-        warnings.push(issue('EXPERT_CODE_REQUIRES_ANONYMITY_REVIEW', `${path}.expertCode`, 'This code resembles a personal name; confirm it is an anonymous research code.'))
+        warnings.push(issue('EXPERT_CODE_REQUIRES_REVIEW', `${path}.expertCode`, 'This code resembles a personal name; confirm it is an anonymous research code.'))
       }
       codes.add(expert?.expertCode)
       for (const candidateId of analysisCandidateIds) {

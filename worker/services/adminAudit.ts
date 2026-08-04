@@ -27,6 +27,10 @@ export const ADMIN_AUDIT_ACTIONS = [
   'configuration_set_published',
   'configuration_set_activated',
   'configuration_set_rollback_activated',
+  'benchmark_set_created',
+  'benchmark_set_updated',
+  'benchmark_set_validated',
+  'benchmark_set_published',
 ] as const
 
 export type AdminAuditAction = typeof ADMIN_AUDIT_ACTIONS[number]

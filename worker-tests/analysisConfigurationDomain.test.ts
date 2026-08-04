@@ -5,7 +5,7 @@ import {
   validateReliabilityDocument,
   validateScoringDefinitionDocument,
 } from '../worker/domain/analysisConfiguration'
-import { fingerprintFormalAnalysisRun } from '../worker/domain/analysisFingerprint'
+import { fingerprintExpertBenchmarkContent, fingerprintFormalAnalysisRun } from '../worker/domain/analysisFingerprint'
 
 const policies = [
   { candidateId: 'A', direction: -1, includeInCoreEac: true },
@@ -35,6 +35,22 @@ describe('analysis configuration domain validation', () => {
     })).resolves.not.toBe(await fingerprintFormalAnalysisRun(base))
   })
 
+  it('keeps an expert benchmark fingerprint stable across matrix ordering', async () => {
+    const ordered = {
+      displayName: 'Expert panel', ratedAt: '2026-08-04T00:00:00.000Z',
+      candidatePolicies: policies,
+      experts,
+    }
+    const reordered = {
+      ...ordered,
+      candidatePolicies: [...policies].reverse(),
+      experts: [...experts].reverse(),
+    }
+    expect(await fingerprintExpertBenchmarkContent(ordered)).toBe(
+      await fingerprintExpertBenchmarkContent(reordered),
+    )
+  })
+
   it('accepts a complete anonymous expert panel and warns for name-like code', () => {
     const result = validateExpertBenchmarkDocument({
       displayName: '专家基准 v1',
@@ -48,7 +64,7 @@ describe('analysis configuration domain validation', () => {
 
     expect(result.errors).toEqual([])
     expect(result.warnings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'EXPERT_CODE_REQUIRES_ANONYMITY_REVIEW' }),
+      expect.objectContaining({ code: 'EXPERT_CODE_REQUIRES_REVIEW' }),
     ]))
   })
 
