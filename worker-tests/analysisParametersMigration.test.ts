@@ -11,7 +11,7 @@ afterEach(async () => {
 
 describe('0013 analysis parameters and recomputation migration', () => {
   it('advances the schema and creates immutable versioned analysis configuration tables', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0013_analysis_configuration_recompute.sql' })
     runtime = created.runtime
 
     const schema = await created.db.prepare(
@@ -21,7 +21,7 @@ describe('0013 analysis parameters and recomputation migration', () => {
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all<{ name: string }>()
 
-    expect(schema?.value).toBe('12')
+    expect(schema?.value).toBe('11')
     expect(tables.results.map(({ name }) => name)).toEqual(expect.arrayContaining([
       'benchmark_candidate_policies',
       'analysis_validation_runs',

@@ -31,6 +31,18 @@ export const ADMIN_AUDIT_ACTIONS = [
   'benchmark_set_updated',
   'benchmark_set_validated',
   'benchmark_set_published',
+  'norm_set_created',
+  'norm_set_updated',
+  'norm_set_validated',
+  'norm_set_published',
+  'reliability_set_created',
+  'reliability_set_updated',
+  'reliability_set_validated',
+  'reliability_set_published',
+  'scoring_definition_created',
+  'scoring_definition_updated',
+  'scoring_definition_validated',
+  'scoring_definition_published',
 ] as const
 
 export type AdminAuditAction = typeof ADMIN_AUDIT_ACTIONS[number]
@@ -54,6 +66,10 @@ const SAFE_METADATA_KEYS = new Set([
   'contentFingerprint',
   'warningCount',
   'errorCount',
+  'sampleSize',
+  'metricCount',
+  'fingerprint',
+  'totalRdiEnabled',
 ])
 
 export function safeAdminAuditMetadata(

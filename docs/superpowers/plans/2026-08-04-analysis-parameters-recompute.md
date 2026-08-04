@@ -11,8 +11,8 @@
 ## Global Constraints
 
 - Work only on `feature/cloudflare-d1-backend`; do not switch, merge, push, deploy, create a PR, reset, stash or clean.
-- Add only forward migration `0013_analysis_configuration_recompute.sql`; do not change migrations 0001-0012.
-- `schema_version` becomes `11`; no migration seed may contain expert scores, norm values, reliability values, jobs, scoring runs, administrator or participant data.
+- Keep the forward migration chain immutable: `0013_analysis_configuration_recompute.sql` is schema 11, `0014_expert_benchmark_management.sql` is schema 12, and `0015_analysis_parameter_management.sql` is schema 13. Do not change migrations 0001-0014.
+- Schema 13 adds lifecycle-only fields and protections; no migration seed may contain expert scores, norm values, reliability values, jobs, scoring runs, administrator or participant data.
 - Published analysis objects, validation history, operation receipts, scoring runs and job history remain immutable.
 - Formal automatic scoring uses the session-bound versions; administrator jobs use their explicit published target tuple without modifying session versions.
 - Stage 8 `prepilotScoring.ts` behavior remains unchanged. Stage 10B has an independent formal-analysis orchestrator.
@@ -46,6 +46,14 @@
 | `src/admin/AdminDashboard.tsx` | Add Analysis navigation entry |
 | `worker-tests/*analysis*.test.ts`, `src/admin/*Analysis*.test.tsx` | Regression and red-green coverage |
 | `docs/backend-stage-10b-analysis-configuration.md` | Operational design, formulas, privacy, migration and cleanup notes |
+
+## Stage 10B parameter-management boundary
+
+- Norm drafts contain exactly `RES`, `EACS`, `DDS`, `GDS`, and `SLS` parameters. Each update supplies finite means, positive SDs, a sample size of at least two, and a non-empty population note.
+- Reliability drafts support only `EAC`; SD must be positive, reliability is in `(0, 1]`, and no benchmark or norm SD is used as a default.
+- Scoring definitions are structured only: `RDI-2.0`, `second`, five exact weights summing to one, `available_case_mean`, `earliest_key_risk`, and `strict_complete_case`. `levelEnabled` is always `false`.
+- Publishing never activates a configuration set, binds a session, triggers a recalculation, or exposes analysis values to participants. Published versions are immutable.
+- This batch manages parameters only. It does not yet calculate formal RCIi/RDI, standard scores, RDIz/RDIT, or recomputation jobs.
 
 ## Task 1: Establish schema-11 red tests and migration contract — completed
 
@@ -426,3 +434,43 @@ deploy, merge or create a PR.
 - Task interfaces use a single `AnalysisBindings` tuple consistently across configuration, formal analysis and jobs.
 - Every production task starts with an explicit failing test and target command.
 - The plan excludes implementation of participant querying, export, deletion, levels, percentiles and deployment.
+
+## Fast Track Release Candidate scope (2026-08-04)
+
+The release plan is deliberately narrowed after the Norm, Reliability and
+Scoring Definition parameter-management batch. This batch remains limited to
+versioned parameter CRUD, validation, publication, immutability, idempotency
+and audit coverage; it does not add participant-facing UI, formal RCI/RDI
+calculation, or recomputation execution.
+
+The remaining implementation is compressed into two independently reviewed
+batches:
+
+1. **Batch A — formal analysis closure.** Add a separate formal scoring
+   service, pin scoring/benchmark/norm/reliability versions to a session,
+   calculate candidate-level RCIi and the five standard scores, and persist
+   strict complete-case RDIz/RDIT (NULL whenever any required raw indicator is
+   missing). Add only a minimal, lease-recoverable recomputation API and a
+   minimal administrator page for creating a job, running its next batch and
+   viewing progress. Formal, resume, completion and Quick surfaces must not
+   expose analysis outcomes. No levels, percentiles, charts, automatic queue
+   or advanced filtering are in this batch.
+2. **Batch B — delivery closure.** Add administrator participant/session
+   pagination and basic filters; CSV-in-ZIP export with identity joined into
+   the summary and masked phone numbers; single and bulk permanent deletion
+   with a tombstone ledger and deletion audit; essential rate limiting and
+   anomaly handling; local synthetic-data cleanup; then authorized remote
+   migration, administrator initialization, smoke tests, Worker deployment
+   and post-deployment regression verification.
+
+Deferred to 1.1: charts, advanced querying and anomaly dashboards, automatic
+background queues, multi-administrator permissions, percentiles and
+resilience-level presentation, UI polish and unrelated dependency/refactor
+work.
+
+For each source-changing major batch, run one full `npm run test:worker` only
+after its source has frozen. While that Worker suite runs, frontend tests,
+typecheck and build may run in parallel. Run `npm run check` only immediately
+before that batch's commit. Documentation-only edits do not require another
+long Worker run. Critical security, version-pinning, deletion and data-leakage
+coverage remains mandatory.

@@ -32,6 +32,36 @@ export function fingerprintExpertBenchmarkContent(
   })
 }
 
+export function fingerprintNormContent(value: {
+  displayName: string; scoringVersion: string; sourceType: string; sampleSize: number; populationNote: string
+  parameters: Record<string, { mean: number; sd: number }>
+}): Promise<string> {
+  return fingerprintValue({ algorithm: 'norm-content-v1', displayName: value.displayName,
+    scoringVersion: value.scoringVersion, sourceType: value.sourceType, sampleSize: value.sampleSize,
+    populationNote: value.populationNote,
+    parameters: ['RES', 'EACS', 'DDS', 'GDS', 'SLS'].map((metric) => ({ metric, ...value.parameters[metric] })),
+  })
+}
+
+function withoutLifecycleFields(value: Record<string, unknown>): Record<string, unknown> {
+  const { expectedRevision, revision, revisionNo, status, validationStatus, validationReport, createdAt, updatedAt, validatedAt, publishedAt, adminUserId, createdByAdminUserId, updatedByAdminUserId, publishedByAdminUserId, requestId, ...content } = value
+  void expectedRevision; void revision; void revisionNo; void status; void validationStatus
+  void validationReport; void createdAt; void updatedAt; void validatedAt; void publishedAt
+  void adminUserId; void createdByAdminUserId; void updatedByAdminUserId; void publishedByAdminUserId; void requestId
+  return content
+}
+
+export function fingerprintReliabilityContent(value: {
+  displayName: string; scoringVersion: string; metricCode: string; sd: number; reliability: number; sampleSize: number; populationNote: string
+  expectedRevision?: number
+}): Promise<string> {
+  return fingerprintValue({ algorithm: 'reliability-content-v1', ...withoutLifecycleFields(value) })
+}
+
+export function fingerprintScoringDefinitionContent(value: Record<string, unknown>): Promise<string> {
+  return fingerprintValue({ algorithm: 'scoring-definition-content-v1', ...withoutLifecycleFields(value) })
+}
+
 export type FormalAnalysisFingerprintInput = {
   sourceFacts: Record<string, unknown>
   versions: {

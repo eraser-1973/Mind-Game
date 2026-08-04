@@ -5,7 +5,7 @@ import {
   validateReliabilityDocument,
   validateScoringDefinitionDocument,
 } from '../worker/domain/analysisConfiguration'
-import { fingerprintExpertBenchmarkContent, fingerprintFormalAnalysisRun } from '../worker/domain/analysisFingerprint'
+import { fingerprintExpertBenchmarkContent, fingerprintFormalAnalysisRun, fingerprintReliabilityContent, fingerprintScoringDefinitionContent } from '../worker/domain/analysisFingerprint'
 
 const policies = [
   { candidateId: 'A', direction: -1, includeInCoreEac: true },
@@ -49,6 +49,17 @@ describe('analysis configuration domain validation', () => {
     expect(await fingerprintExpertBenchmarkContent(ordered)).toBe(
       await fingerprintExpertBenchmarkContent(reordered),
     )
+  })
+
+  it('excludes lifecycle revision from reliability and scoring content fingerprints', async () => {
+    const reliability = { displayName: 'EAC', scoringVersion: 'rdi-v2', metricCode: 'EAC', sd: 5, reliability: 0.8, sampleSize: 24, populationNote: 'Cohort', expectedRevision: 1 }
+    await expect(fingerprintReliabilityContent(reliability)).resolves.toBe(await fingerprintReliabilityContent({ ...reliability, expectedRevision: 9 }))
+
+    const scoring = { displayName: 'RDI', formulaFamily: 'RDI-2.0', timeUnit: 'second', totalRdiEnabled: true, levelEnabled: false, expectedRevision: 1, weights: { RES: .2, EACS: .2, DDS: .2, GDS: .2, SLS: .2 }, eacAggregation: 'available_case_mean', eacsAggregation: 'available_case_mean', riskAnchorPolicy: 'earliest_key_risk', missingMetricPolicy: 'strict_complete_case', slsMapping: { stopLoss: 100, giveUp: 80, continue: 30, notTriggered: null, timeoutUnanswered: null } }
+    await expect(fingerprintScoringDefinitionContent(scoring)).resolves.toBe(await fingerprintScoringDefinitionContent({ ...scoring, expectedRevision: 9 }))
+    await expect(fingerprintScoringDefinitionContent(scoring)).resolves.toBe(await fingerprintScoringDefinitionContent({
+      ...scoring, createdByAdminUserId: 'admin-1', updatedByAdminUserId: 'admin-2', publishedByAdminUserId: 'admin-3', validationReport: { errors: [] },
+    }))
   })
 
   it('accepts a complete anonymous expert panel and warns for name-like code', () => {
@@ -106,5 +117,23 @@ describe('analysis configuration domain validation', () => {
       eacsAggregation: 'available_case', riskAnchor: 'earliest_key_risk',
       slsMapping: { stopLoss: 100, giveUp: 80, continue: 30 },
     }).errors).toEqual([])
+  })
+
+  it('rejects unknown norm metrics and unknown scoring weights in the shared validators', () => {
+    const norm = validateNormDocument({
+      displayName: 'Norm', expectedRevision: 1, scoringVersion: 'rdi-v2', sampleSize: 2, populationNote: 'Cohort',
+      metrics: {
+        RES: { mean: 1, sd: 1 }, EACS: { mean: 1, sd: 1 }, DDS: { mean: 1, sd: 1 }, GDS: { mean: 1, sd: 1 }, SLS: { mean: 1, sd: 1 }, OTHER: { mean: 1, sd: 1 },
+      },
+    })
+    expect(norm.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'NORM_METRIC_UNKNOWN' })]))
+
+    const scoring = validateScoringDefinitionDocument({
+      displayName: 'RDI', expectedRevision: 1, formulaFamily: 'RDI-2.0', timeUnit: 'second', totalRdiEnabled: true, levelEnabled: false,
+      weights: { RES: 0.2, EACS: 0.2, DDS: 0.2, GDS: 0.2, SLS: 0.2, OTHER: 0 },
+      missingPolicy: 'strict_complete_case', eacAggregation: 'available_case', eacsAggregation: 'available_case', riskAnchor: 'earliest_key_risk',
+      slsMapping: { stopLoss: 100, giveUp: 80, continue: 30 },
+    })
+    expect(scoring.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'WEIGHTS_UNKNOWN' })]))
   })
 })

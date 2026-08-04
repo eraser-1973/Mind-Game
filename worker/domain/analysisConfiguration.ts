@@ -176,6 +176,9 @@ export function validateNormDocument(value: unknown): AnalysisValidationResult {
   if (!validVersion(document.scoringVersion)) errors.push(issue('SCORING_VERSION_INVALID', 'scoringVersion', 'A version identifier is required.'))
   if (!Number.isInteger(document.sampleSize) || (document.sampleSize as number) < 2) errors.push(issue('SAMPLE_SIZE_INVALID', 'sampleSize', 'At least two observations are required.'))
   if (!validText(document.populationNote)) errors.push(issue('POPULATION_NOTE_REQUIRED', 'populationNote', 'A population note is required.'))
+  if (document.metrics && Object.keys(document.metrics).some((metric) => !analysisMetricCodes.includes(metric as AnalysisMetricCode))) {
+    errors.push(issue('NORM_METRIC_UNKNOWN', 'metrics', 'Only RES, EACS, DDS, GDS and SLS norm metrics are supported.'))
+  }
   for (const metric of analysisMetricCodes) {
     const parameter = document.metrics?.[metric]
     if (!finiteNumber(parameter?.mean) || !finiteNumber(parameter?.sd) || (parameter?.sd ?? 0) <= 0) {
@@ -216,6 +219,9 @@ export function validateScoringDefinitionDocument(value: unknown): AnalysisValid
   if (document.eacAggregation !== 'available_case' || document.eacsAggregation !== 'available_case') errors.push(issue('AGGREGATION_INVALID', 'aggregation', 'EAC and EACS use available-case aggregation.'))
   if (document.riskAnchor !== 'earliest_key_risk') errors.push(issue('RISK_ANCHOR_INVALID', 'riskAnchor', 'The earliest key risk is required.'))
   if (document.slsMapping?.stopLoss !== 100 || document.slsMapping?.giveUp !== 80 || document.slsMapping?.continue !== 30) errors.push(issue('SLS_MAPPING_INVALID', 'slsMapping', 'SLS mapping is fixed.'))
+  if (document.weights && Object.keys(document.weights).some((metric) => !analysisMetricCodes.includes(metric as AnalysisMetricCode))) {
+    errors.push(issue('WEIGHTS_UNKNOWN', 'weights', 'Only the five defined RDI metric weights are supported.'))
+  }
   const sum = analysisMetricCodes.reduce((total, code) => total + (document.weights?.[code] ?? Number.NaN), 0)
   if (analysisMetricCodes.some((code) => !finiteNumber(document.weights?.[code])) || Math.abs(sum - 1) > 1e-9) {
     errors.push(issue('WEIGHTS_INVALID', 'weights', 'Five finite weights must sum to one.'))

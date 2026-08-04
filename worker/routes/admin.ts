@@ -5,6 +5,7 @@ import { handleAdminLogin } from './adminLogin'
 import { handleAdminLogout, handleAdminSession } from './adminSession'
 import { handleAdminConfiguration } from './adminConfiguration'
 import { handleAdminAnalysis } from './adminAnalysis'
+import { handleAdminAnalysisParameters } from './adminAnalysisParameters'
 
 export function handleAdminRequest(
   request: Request,
@@ -17,6 +18,9 @@ export function handleAdminRequest(
   if (path === '/api/admin/logout') return handleAdminLogout(request, env, requestId)
   if (path === '/api/admin/audit-logs') return handleAdminAuditLogs(request, env, requestId)
   if (path.startsWith('/api/admin/config/')) return handleAdminConfiguration(request, env, requestId)
+  if (path.startsWith('/api/admin/analysis/norm-sets')
+    || path.startsWith('/api/admin/analysis/reliability-sets')
+    || path.startsWith('/api/admin/analysis/scoring-definitions')) return handleAdminAnalysisParameters(request, env, requestId)
   if (path.startsWith('/api/admin/analysis/')) return handleAdminAnalysis(request, env, requestId)
   return adminErrorResponse(
     404,
