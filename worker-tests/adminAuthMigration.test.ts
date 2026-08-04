@@ -36,7 +36,7 @@ async function insertAdmin(db: D1Database, suffix = '1') {
 
 describe('0011 administrator authentication and audit migration', () => {
   it('keeps the security schema and policy intact under schema version 10 without a default administrator', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
 
     const tables = await created.db.prepare(
@@ -84,7 +84,7 @@ describe('0011 administrator authentication and audit migration', () => {
   })
 
   it('enforces one administrator, UUID/Base64/password constraints, and has no plaintext password column', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const columns = await created.db.prepare(
       'PRAGMA table_info(admin_users)',
@@ -104,7 +104,7 @@ describe('0011 administrator authentication and audit migration', () => {
   })
 
   it('enforces unique hashed tokens, foreign keys, protected session identity, and immutable audit rows', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     await insertAdmin(created.db)
 
@@ -193,7 +193,7 @@ describe('0011 administrator authentication and audit migration', () => {
   })
 
   it('keeps Stage 1-8 configuration and scoring rows intact after applying 0011', async () => {
-    const created = await createWorkerRuntime()
+    const created = await createWorkerRuntime({ throughMigration: '0012_admin_material_configuration.sql' })
     runtime = created.runtime
     const config = await created.db.prepare(
       `SELECT config_set_id, scoring_version, benchmark_version
