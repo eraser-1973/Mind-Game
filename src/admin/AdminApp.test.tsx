@@ -71,6 +71,31 @@ describe('isolated administrator application', () => {
     expect(password.props.autoComplete).toBe('current-password')
   })
 
+  it('opens the public administrator console without rendering or calling password login', async () => {
+    const paths: string[] = []
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input)
+      paths.push(path)
+      if (path === '/api/admin/session') return envelope({
+        authenticated: true,
+        authMode: 'public',
+        username: 'public-admin',
+      })
+      if (path.startsWith('/api/admin/audit-logs')) return envelope({ items: [], nextCursor: null })
+      if (path === '/api/admin/config/material-sets') return envelope({ items: [] })
+      if (path === '/api/admin/config/point-rules') return envelope({ items: [] })
+      if (path === '/api/admin/config/sunk-cost-rules') return envelope({ items: [] })
+      if (path === '/api/admin/config/configuration-sets') return envelope({ items: [] })
+      throw new Error(`Unexpected request ${path}`)
+    })
+    await renderAdmin()
+    const output = JSON.stringify(renderer!.toJSON())
+    expect(renderer!.root.findAllByType(AdminLoginScreen)).toHaveLength(0)
+    expect(output).toContain('PUBLIC ADMIN MODE')
+    expect(output).toContain('临时公开管理模式')
+    expect(paths).not.toContain('/api/admin/login')
+  })
+
   it('shows one generic error, clears the password, and disables the button while logging in', async () => {
     let resolveLogin: ((value: Response) => void) | undefined
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {

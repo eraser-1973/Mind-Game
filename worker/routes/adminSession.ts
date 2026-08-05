@@ -56,6 +56,16 @@ export async function handleAdminSession(
   }
   try {
     const context = await authenticateAdmin(request, env, { requestId })
+    if (context.authMode === 'public') {
+      const token = generateAdminToken()
+      const headers = new Headers()
+      headers.append('Set-Cookie', serializeAdminCsrfCookie(token, secureRequest(request)))
+      return adminSuccessResponse({
+        authenticated: true,
+        authMode: 'public',
+        username: 'public-admin',
+      }, requestId, 200, headers)
+    }
     let csrfCookie: string | null = null
     const supplied = readCookie(request, 'mg_admin_csrf')
     const suppliedHash = supplied ? await hashAdminToken(supplied) : null
@@ -118,6 +128,16 @@ export async function handleAdminLogout(
   try {
     const context = await authenticateAdmin(request, env, { requestId })
     await requireAdminCsrf(request, context)
+    if (context.authMode === 'public') {
+      const headers = new Headers()
+      headers.append('Set-Cookie', clearAdminCsrfCookie(secureRequest(request)))
+      return adminSuccessResponse(
+        { authenticated: false, loggedOut: true },
+        requestId,
+        200,
+        headers,
+      )
+    }
     const now = new Date().toISOString()
     await env.DB.batch([
       env.DB.prepare(

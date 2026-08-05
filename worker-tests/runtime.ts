@@ -56,11 +56,15 @@ async function getBundledWorker(): Promise<string> {
 export async function createWorkerRuntime(options?: {
   migrate?: boolean
   throughMigration?: string
+  bindings?: Record<string, string>
 }) {
   const runtime = new Miniflare({
     compatibilityDate: '2026-07-01',
     d1Databases: ['DB'],
-    bindings: { TOMBSTONE_HASH_SECRET: 'test-only-tombstone-secret' },
+    bindings: {
+      TOMBSTONE_HASH_SECRET: 'test-only-tombstone-secret',
+      ...options?.bindings,
+    },
     modules: true,
     script: await getBundledWorker(),
   })

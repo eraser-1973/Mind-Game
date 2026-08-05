@@ -3,6 +3,9 @@
   "name": "mindgame1",
   "main": "worker/index.ts",
   "compatibility_date": "2026-07-01",
+  "vars": {
+    "ADMIN_AUTH_MODE": "public"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

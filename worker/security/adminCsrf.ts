@@ -32,6 +32,7 @@ export async function requireAdminCsrf(
   const cookie = readCookie(request, 'mg_admin_csrf')
   const header = request.headers.get('X-CSRF-Token')
   if (!cookie || !header || !equalText(cookie, header)) throw new AdminCsrfError()
+  if (context.authMode === 'public') return
   const suppliedHash = await hashAdminToken(cookie)
   if (!equalText(suppliedHash, context.csrfTokenHash)) throw new AdminCsrfError()
 }

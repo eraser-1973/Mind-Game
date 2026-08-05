@@ -1,4 +1,5 @@
 import type { Env } from '../env'
+import { AdminAuthError, adminAuthMode } from '../auth/adminAuth'
 import { adminErrorResponse, adminSuccessResponse } from '../http/adminResponses'
 import {
   adminAuditForExistingLoginAttemptStatement,
@@ -241,6 +242,16 @@ export async function handleAdminLogin(
   }
 
   try {
+    if (adminAuthMode(env) === 'public') {
+      return adminErrorResponse(
+        410,
+        {
+          code: 'ADMIN_PASSWORD_LOGIN_DISABLED',
+          message: 'Password login is disabled while public administrator mode is active.',
+        },
+        requestId,
+      )
+    }
     const input = await parseLoginRequest(request)
     const nowDate = new Date()
     const now = nowDate.toISOString()
@@ -467,7 +478,7 @@ export async function handleAdminLogin(
       headers,
     )
   } catch (error) {
-    if (error instanceof AdminOriginError || error instanceof AdminLoginRequestError) {
+    if (error instanceof AdminOriginError || error instanceof AdminLoginRequestError || error instanceof AdminAuthError) {
       return adminErrorResponse(
         error.status,
         { code: error.code, message: error.message },

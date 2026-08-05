@@ -1,5 +1,6 @@
-export type AdminSessionData = {
+export type PasswordAdminSessionData = {
   authenticated: true
+  authMode?: 'password'
   admin: { username: string }
   session: {
     createdAt: string
@@ -8,6 +9,14 @@ export type AdminSessionData = {
     absoluteExpiresAt: string
   }
 }
+
+export type PublicAdminSessionData = {
+  authenticated: true
+  authMode: 'public'
+  username: 'public-admin'
+}
+
+export type AdminSessionData = PasswordAdminSessionData | PublicAdminSessionData
 
 export type AdminLoginData = {
   authenticated: true

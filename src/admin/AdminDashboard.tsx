@@ -21,8 +21,15 @@ export function AdminDashboard({
   onLogout: () => Promise<void>
 }) {
   const [section, setSection] = useState<'configuration' | 'research' | 'export' | 'audit'>('configuration')
+  const isPublicMode = session.authMode === 'public'
   return (
     <main className="admin-shell admin-shell--dashboard" data-testid="admin-dashboard">
+      {isPublicMode ? (
+        <section className="admin-public-mode-warning" role="alert">
+          <strong>PUBLIC ADMIN MODE</strong>
+          <p>临时公开管理模式：任何获得该网址的人都可以查看、导出或删除研究数据。</p>
+        </section>
+      ) : null}
       <header className="admin-console-header">
         <div>
           <span className="eyebrow">MIND GAME · ADMIN</span>
@@ -30,12 +37,12 @@ export function AdminDashboard({
           <p>安全认证基础已启用</p>
         </div>
         <button className="button button--ghost button--compact" onClick={() => void onLogout()}>
-          安全退出
+          {isPublicMode ? '返回首页' : '安全退出'}
         </button>
       </header>
       <section className="admin-session-card">
-        <div><span>当前管理员</span><strong>{session.admin.username}</strong></div>
-        <div><span>绝对过期时间</span><strong>{new Date(session.session.absoluteExpiresAt).toLocaleString('zh-CN')}</strong></div>
+        <div><span>当前管理员</span><strong>{isPublicMode ? session.username : session.admin.username}</strong></div>
+        <div><span>{isPublicMode ? '访问模式' : '绝对过期时间'}</span><strong>{isPublicMode ? 'PUBLIC ADMIN MODE' : new Date(session.session.absoluteExpiresAt).toLocaleString('zh-CN')}</strong></div>
       </section>
       <nav className="admin-dashboard-nav" aria-label="管理员功能">
         <button aria-pressed={section === 'configuration'} onClick={() => setSection('configuration')}>实验配置</button>

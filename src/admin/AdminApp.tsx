@@ -84,6 +84,7 @@ export function AdminApp() {
   }
 
   const logout = async () => {
+    const isPublicMode = session?.authMode === 'public'
     try {
       await logoutAdmin()
     } finally {
@@ -91,7 +92,11 @@ export function AdminApp() {
       setAudits([])
       setNextCursor(null)
       setPassword('')
-      setView('login')
+      if (isPublicMode) {
+        window.location.assign('/')
+      } else {
+        setView('login')
+      }
     }
   }
 

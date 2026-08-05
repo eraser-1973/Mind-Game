@@ -11,14 +11,16 @@ export class AdminAuthError extends Error {
     readonly code:
       | 'ADMIN_UNAUTHORIZED'
       | 'ADMIN_SESSION_REVOKED'
-      | 'ADMIN_SESSION_EXPIRED',
+      | 'ADMIN_SESSION_EXPIRED'
+      | 'ADMIN_PUBLIC_MODE_NOT_READY'
+      | 'ADMIN_AUTH_MODE_INVALID',
     message: string,
+    readonly status: 401 | 500 | 503 = 401,
   ) {
     super(message)
     this.name = 'AdminAuthError'
   }
 
-  readonly status = 401
 }
 
 type AdminAuthRow = {
@@ -42,7 +44,8 @@ type AdminAuthRow = {
   session_touch_interval_sec: number
 }
 
-export type AdminContext = {
+export type PasswordAdminContext = {
+  authMode: 'password'
   adminUserId: string
   username: string
   passwordVersion: number
@@ -57,6 +60,28 @@ export type AdminContext = {
   absoluteExpiresAt: string
   sessionIdleSec: number
   sessionTouchIntervalSec: number
+}
+
+export type PublicAdminContext = {
+  authMode: 'public'
+  adminUserId: string
+  username: 'public-admin'
+  adminSessionId: null
+  clientFingerprintHash: null
+}
+
+export type AdminContext = PasswordAdminContext | PublicAdminContext
+
+export type AdminAuthMode = 'password' | 'public'
+
+export function adminAuthMode(env: Env): AdminAuthMode {
+  const value = env.ADMIN_AUTH_MODE ?? 'password'
+  if (value === 'password' || value === 'public') return value
+  throw new AdminAuthError(
+    'ADMIN_AUTH_MODE_INVALID',
+    'Administrator authentication is temporarily unavailable.',
+    500,
+  )
 }
 
 function unauthorized(): AdminAuthError {
@@ -106,6 +131,26 @@ export async function authenticateAdmin(
   env: Env,
   options: { now?: Date; requestId?: string } = {},
 ): Promise<AdminContext> {
+  if (adminAuthMode(env) === 'public') {
+    const singleton = await env.DB.prepare(
+      `SELECT admin_user_id FROM admin_users
+       WHERE singleton_id = 1 AND is_active = 1`,
+    ).first<{ admin_user_id: string }>()
+    if (!singleton) {
+      throw new AdminAuthError(
+        'ADMIN_PUBLIC_MODE_NOT_READY',
+        'Public administrator mode is not ready.',
+        503,
+      )
+    }
+    return {
+      authMode: 'public',
+      adminUserId: singleton.admin_user_id,
+      username: 'public-admin',
+      adminSessionId: null,
+      clientFingerprintHash: null,
+    }
+  }
   const rawToken = readCookie(request, 'mg_admin')
   if (!rawToken || !isAdminToken(rawToken)) throw unauthorized()
   const tokenHash = await hashAdminToken(rawToken)
@@ -164,6 +209,7 @@ export async function authenticateAdmin(
   }
 
   return {
+    authMode: 'password',
     adminUserId: row.admin_user_id,
     username: row.username,
     passwordVersion: row.user_password_version,

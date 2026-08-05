@@ -74,6 +74,7 @@ const SAFE_METADATA_KEYS = new Set([
   'fingerprint',
   'totalRdiEnabled',
   'deletedCount',
+  'authMode',
 ])
 
 export function safeAdminAuditMetadata(
