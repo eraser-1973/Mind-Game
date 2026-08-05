@@ -104,18 +104,19 @@ describe('sunk cost domain rules', () => {
 
 describe('final decision eligibility', () => {
   it.each([
-    ['T2_COMPLETE', null, true, 'T2'],
-    ['T3_COMPLETE', null, true, 'T3'],
-    ['T2_ACTIVE', 'give_up', true, 'T1'],
-    ['T1_COMPLETE', null, false, null],
-    ['T2_ACTIVE', 'continue', false, null],
-  ] as const)('derives %s with choice %s', (stageStatus, sunkChoice, allowed, sourceStage) => {
+    ['T2_ACTIVE', null, true, 'T2', true],
+    ['T3_COMPLETE', null, true, 'T3', false],
+    ['T2_ACTIVE', 'give_up', true, 'T1', false],
+    ['T1_COMPLETE', null, false, null, false],
+    ['T2_ACTIVE', 'continue', false, null, false],
+  ] as const)('derives %s with choice %s', (stageStatus, sunkChoice, allowed, sourceStage, canFinalizeAtT2) => {
     expect(deriveFinalDecisionEligibility({
       stageStatus,
       sunkChoice,
       hasT1Choice: true,
-      hasT2Choice: stageStatus !== 'T1_COMPLETE' && stageStatus !== 'T2_ACTIVE',
+      hasT2Choice: false,
       hasT3Choice: stageStatus === 'T3_COMPLETE',
+      canFinalizeAtT2,
       sunkResponsePending: false,
       finalSubmitted: false,
       completionStatus: 'in_progress',
@@ -126,11 +127,12 @@ describe('final decision eligibility', () => {
 
   it('rejects missing T1, pending sunk response, expiry, or a sealed final', () => {
     const base = {
-      stageStatus: 'T2_COMPLETE' as const,
+      stageStatus: 'T2_ACTIVE' as const,
       sunkChoice: null,
       hasT1Choice: true,
-      hasT2Choice: true,
+      hasT2Choice: false,
       hasT3Choice: false,
+      canFinalizeAtT2: true,
       sunkResponsePending: false,
       finalSubmitted: false,
       completionStatus: 'in_progress',

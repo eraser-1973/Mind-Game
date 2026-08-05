@@ -145,30 +145,18 @@ describe('formal T2 ratings and stage choice', () => {
     expect(await overwrite.text()).toContain('RATING_ALREADY_SEALED')
   })
 
-  it('requires every shallow candidate T2 rating, seals T2 once, and locks further shallow/T2 writes', async () => {
+  it('allows additional shallow verification while rejecting the removed T2 candidate choice', async () => {
     const session = await createT1Complete()
     await unlock(session, 'B', 'shallow')
     await unlock(session, 'D', 'shallow')
     await rate(session, 'B', 'T2', 75)
-    const incomplete = await choose(session, 'T2')
-    expect(incomplete.status).toBe(409)
-    expect(await incomplete.text()).toContain('T2_RATINGS_INCOMPLETE')
     await rate(session, 'D', 'T2', 74)
 
-    const key = crypto.randomUUID()
-    const choice = await choose(session, 'T2', 'B', 80, key)
-    expect(choice.status).toBe(201)
-    expect(await choice.json()).toMatchObject({ data: {
-      created: true, stage: 'T2', candidateId: 'B', confidence: 80,
-      currentStage: 'T2', stageStatus: 'T2_COMPLETE', sequenceNo: 12,
-    } })
-    expect((await choose(session, 'T2', 'D', 10, key)).status).toBe(200)
-    const different = await choose(session, 'T2', 'D')
-    expect(different.status).toBe(409)
-    expect(await different.text()).toContain('STAGE_CHOICE_ALREADY_SEALED')
-    const lateShallow = await unlock(session, 'E', 'shallow')
-    expect(lateShallow.status).toBe(409)
-    expect(await lateShallow.text()).toContain('T2_STAGE_ALREADY_SEALED')
+    const removedChoice = await choose(session, 'T2', 'B', 80)
+    expect(removedChoice.status).toBe(409)
+    expect(await removedChoice.text()).toContain('T2_STAGE_CHOICE_REMOVED')
+    const additionalShallow = await unlock(session, 'E', 'shallow')
+    expect(additionalShallow.status).toBe(201)
     const lateRating = await rate(session, 'B', 'T2', 90)
     expect(lateRating.status).toBe(409)
     expect(await lateRating.text()).toContain('RATING_ALREADY_SEALED')
@@ -176,14 +164,22 @@ describe('formal T2 ratings and stage choice', () => {
 })
 
 describe('formal deep evidence and T3', () => {
-  it('requires the T2 choice, shallow evidence, and T2 rating before deep unlock', async () => {
+  it('removes the T2 choice while still requiring shallow evidence and a sealed T2 rating before deep unlock', async () => {
     const session = await createT1Complete()
     await unlock(session, 'B', 'shallow')
+
+    const removedChoice = await choose(session, 'T2')
+    expect(removedChoice.status).toBe(409)
+    expect(await removedChoice.text()).toContain('T2_STAGE_CHOICE_REMOVED')
+
+    const missingT2Rating = await unlock(session, 'B', 'deep')
+    expect(missingT2Rating.status).toBe(409)
+    expect(await missingT2Rating.text()).toContain('T2_RATING_REQUIRED')
+
     await rate(session, 'B', 'T2', 75)
-    const missingChoice = await unlock(session, 'B', 'deep')
-    expect(missingChoice.status).toBe(409)
-    expect(await missingChoice.text()).toContain('T2_STAGE_CHOICE_REQUIRED')
-    await choose(session, 'T2')
+    const deep = await unlock(session, 'B', 'deep')
+    expect(deep.status).toBe(201)
+
     const missingShallow = await unlock(session, 'D', 'deep')
     expect(missingShallow.status).toBe(409)
     expect(await missingShallow.text()).toContain('SHALLOW_EVIDENCE_REQUIRED')
@@ -193,11 +189,10 @@ describe('formal deep evidence and T3', () => {
     const session = await createT1Complete()
     await unlock(session, 'B', 'shallow')
     await rate(session, 'B', 'T2', 75)
-    await choose(session, 'T2')
     const deep = await unlock(session, 'B', 'deep')
     expect(deep.status).toBe(201)
     expect(await deep.json()).toMatchObject({ data: {
-      candidateId: 'B', level: 'deep', ratingStage: 'T3', sequenceNo: 11,
+      candidateId: 'B', level: 'deep', ratingStage: 'T3', sequenceNo: 10,
       points: { before: 4, cost: 3, after: 1, total: 5 },
       currentStage: 'T3', stageStatus: 'T3_ACTIVE',
       evidence: [
@@ -208,13 +203,13 @@ describe('formal deep evidence and T3', () => {
     const t3 = await rate(session, 'B', 'T3', 86)
     expect(t3.status).toBe(201)
     expect(await t3.json()).toMatchObject({ data: {
-      candidateId: 'B', stage: 'T3', ratingValue: 86, sequenceNo: 12,
+      candidateId: 'B', stage: 'T3', ratingValue: 86, sequenceNo: 11,
       evidenceIdsSeen: ['B-t2-1', 'B-t2-2', 'B-t3-1', 'B-t3-2'],
     } })
     const choice = await choose(session, 'T3', 'B', 88)
     expect(choice.status).toBe(201)
     expect(await choice.json()).toMatchObject({ data: {
-      stage: 'T3', currentStage: 'T3', stageStatus: 'T3_COMPLETE', sequenceNo: 13,
+      stage: 'T3', currentStage: 'T3', stageStatus: 'T3_COMPLETE', sequenceNo: 12,
     } })
     const lateDeep = await unlock(session, 'B', 'deep', crypto.randomUUID())
     expect(lateDeep.status).toBe(200)
@@ -239,7 +234,6 @@ describe('formal deep evidence and T3', () => {
     await unlock(session, 'C', 'shallow')
     await rate(session, 'A', 'T2', 55)
     await rate(session, 'C', 'T2', 60)
-    await choose(session, 'T2', 'A')
     await unlock(session, 'A', 'deep')
     await unlock(session, 'C', 'deep')
     await rate(session, 'A', 'T3', 45)
@@ -261,7 +255,6 @@ describe('formal deep evidence and T3', () => {
     await unlock(session, 'D', 'shallow')
     await rate(session, 'B', 'T2', 75)
     await rate(session, 'D', 'T2', 76)
-    await choose(session, 'T2')
     const [left, right] = await Promise.all([
       unlock(session, 'B', 'deep'),
       unlock(session, 'D', 'deep'),
@@ -283,7 +276,6 @@ describe('Stage 5 formal resume', () => {
     const session = await createT1Complete()
     await unlock(session, 'B', 'shallow')
     await rate(session, 'B', 'T2', 75)
-    await choose(session, 'T2')
     await unlock(session, 'B', 'deep')
     await rate(session, 'B', 'T3', 86)
 
@@ -299,7 +291,6 @@ describe('Stage 5 formal resume', () => {
       points: { total: 5, remaining: 1 },
       stageChoices: [
         { stage: 'T1', candidateId: 'B' },
-        { stage: 'T2', candidateId: 'B' },
       ],
       evidenceUnlocks: [
         { candidateId: 'B', level: 'shallow', evidence: [{ id: 'B-t2-1' }, { id: 'B-t2-2' }] },

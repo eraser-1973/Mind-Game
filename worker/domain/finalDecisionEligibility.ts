@@ -8,6 +8,7 @@ export function deriveFinalDecisionEligibility(input: {
   hasT1Choice: boolean
   hasT2Choice: boolean
   hasT3Choice: boolean
+  canFinalizeAtT2: boolean
   sunkResponsePending: boolean
   finalSubmitted: boolean
   completionStatus: string
@@ -32,6 +33,9 @@ export function deriveFinalDecisionEligibility(input: {
   }
   if (input.stageStatus === 'T3_COMPLETE' && input.hasT3Choice) {
     return { allowed: true, sourceStage: 'T3', reason: null }
+  }
+  if (input.stageStatus === 'T2_ACTIVE' && input.canFinalizeAtT2) {
+    return { allowed: true, sourceStage: 'T2', reason: null }
   }
   if (input.stageStatus === 'T2_COMPLETE' && input.hasT2Choice) {
     return { allowed: true, sourceStage: 'T2', reason: null }

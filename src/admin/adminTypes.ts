@@ -62,6 +62,26 @@ export type AdminResearchSession = {
 
 export type AdminResearchPage = { items: AdminResearchSession[]; nextCursor: string | null }
 
+export type AdminFormalAssessmentReport = {
+  sessionSummary: { sessionId: string; status: string; currentStep: string; startedAt: string | null; completedAt: string | null; completionType: string | null }
+  versions: { config: string; task: string; material: string; pointRule: string; sunkCostRule: string; scoring: string; benchmark: string; norm: string | null; reliability: string | null }
+  stageChoices: { t1: AdminReportChoice | null; t2: AdminReportChoice | null; t3: AdminReportChoice | null }
+  finalDecision: AdminReportFinalDecision | null
+  stageRatings: AdminReportRating[]
+  evidenceSummary: { sequence: AdminReportEvidence[]; pointLedger: AdminReportPointLedger[] }
+  pointSummary: { totalPoints: number; remainingPoints: number; usedPoints: number; shallowCount: number; deepCount: number } | null
+  sunkCostSummary: { targetCandidateId: string | null; triggerReason: string; shownAt: string | null; choice: string | null; choiceSubmittedAt: string | null; pointsInvestedBefore: number; choiceStatus: string } | null
+  derivedMetrics: AdminReportMetric[]
+  candidateSummaries: Array<{ candidateId: string; name: string; role: string; benchmarkValue: number | null }>
+}
+
+export type AdminReportChoice = { candidateId: string; confidence: number; submittedAt: string }
+export type AdminReportFinalDecision = { candidateId: string; confidence: number; submitMode: string; sourceStage: string; submittedAt: string; [key: string]: unknown }
+export type AdminReportRating = { candidateId: string; stage: string; ratingValue: number; submittedAt: string; sequenceNo: number }
+export type AdminReportEvidence = { candidateId: string; evidenceLevel: string; pointsBefore: number; pointsCost: number; pointsAfter: number; containsKeyRisk: number; unlockedAt: string; sequenceNo: number }
+export type AdminReportPointLedger = { candidateId: string | null; evidenceLevel: string | null; pointsBefore: number; pointsDelta: number; pointsAfter: number; sequenceNo: number; createdAt: string }
+export type AdminReportMetric = { metricCode: string; numericValue: number | null; calculationStatus: string; missingReason: string | null; computedAt: string }
+
 export type ConfigStatus = 'draft' | 'published' | 'retired'
 export type ValidationStatus = 'not_validated' | 'valid' | 'invalid' | 'stale'
 export type ConfigurationIssue = { code: string; path: string; message: string }

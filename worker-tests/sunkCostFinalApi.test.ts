@@ -217,6 +217,32 @@ describe('sunk cost choice API', () => {
 })
 
 describe('final decision APIs', () => {
+  it('allows the final decision after rated shallow evidence exhausts deep-verification capacity without a T2 choice', async () => {
+    const session = await seedRun({ stage: 'T2', remainingSec: 600 })
+    for (const candidateId of ['B', 'D', 'E']) {
+      const evidence = await post('/api/evidence/unlock', {
+        sessionId: session.sessionId, candidateId, level: 'shallow', clientAt: now(),
+      }, session.cookie)
+      expect(evidence.status).toBe(201)
+      const rating = await post('/api/ratings', {
+        sessionId: session.sessionId, candidateId, stage: 'T2', ratingValue: 60,
+        clientSubmittedAt: now(),
+      }, session.cookie)
+      expect(rating.status).toBe(201)
+    }
+
+    const final = await post('/api/final-decision', {
+      sessionId: session.sessionId, candidateId: 'D', confidence: 70, clientSubmittedAt: now(),
+    }, session.cookie)
+    expect(final.status).toBe(201)
+    expect(await final.json()).toMatchObject({ data: {
+      candidateId: 'D', sourceStage: 'T2', submitMode: 'active',
+    } })
+    const choices = await db.prepare(`SELECT stage FROM stage_choices WHERE session_id=? ORDER BY sequence_no`)
+      .bind(session.sessionId).all<{ stage: string }>()
+    expect(choices.results).toEqual([{ stage: 'T1' }])
+  })
+
   it('requires the eligible sunk prompt before active final submission', async () => {
     const session = await seedRun({ stage: 'T2', t2Choice: true, riskCandidate: 'A', riskPoints: 2 })
     const response = await post('/api/final-decision', {

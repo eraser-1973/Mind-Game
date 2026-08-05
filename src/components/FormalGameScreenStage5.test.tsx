@@ -79,8 +79,8 @@ const shallowB: FormalEvidenceUnlock = {
   candidateId: 'B', level: 'shallow', ratingStage: 'T2', sequenceNo: 8,
   serverAt: '2026-08-01T00:03:00.000Z', points: { before: 5, cost: 1, after: 4 },
   evidence: [
-    { id: 'B-t2-1', title: '调研报告与数据文件', content: '公开浅查材料一', polarity: 'positive', order: 1 },
-    { id: 'B-t2-2', title: '实习证明与工作记录', content: '公开浅查材料二', polarity: 'positive', order: 2 },
+    { id: 'B-t2-1', title: '调研报告与数据文件', content: '公开浅查材料一', order: 1 },
+    { id: 'B-t2-2', title: '实习证明与工作记录', content: '公开浅查材料二', order: 2 },
   ],
 }
 
@@ -88,8 +88,8 @@ const shallowA: FormalEvidenceUnlock = {
   candidateId: 'A', level: 'shallow', ratingStage: 'T2', sequenceNo: 9,
   serverAt: '2026-08-01T00:03:30.000Z', points: { before: 4, cost: 1, after: 3 },
   evidence: [
-    { id: 'A-t2-1', title: '项目材料核验', content: '公开浅查材料一', polarity: 'negative', order: 1 },
-    { id: 'A-t2-2', title: '贡献说明核验', content: '公开浅查材料二', polarity: 'negative', order: 2 },
+    { id: 'A-t2-1', title: '项目材料核验', content: '公开浅查材料一', order: 1 },
+    { id: 'A-t2-2', title: '贡献说明核验', content: '公开浅查材料二', order: 2 },
   ],
 }
 
@@ -167,10 +167,10 @@ describe('FormalGameScreen Stage 5 server state', () => {
     expect(renderer.root.findByType(FormalRatingPanel).props.rating).toMatchObject({ ratingValue: 75, sealed: true })
     const niko = renderer.root.findByType(NikoChatPanel)
     expect(niko.props.messages).toHaveLength(1)
-    expect(niko.props.messages[0]).toMatchObject({ mood: 'happy', relatedEvidenceId: 'B-t2-1' })
+    expect(niko.props.messages[0]).toMatchObject({ mood: 'neutral', relatedEvidenceId: 'B-t2-1' })
   })
 
-  it('shows the T2 stage choice only after every shallow candidate has a sealed T2', () => {
+  it('keeps the evidence workspace visible after a sealed T2 rating instead of rendering a second candidate choice', () => {
     const t2Rating = {
       candidateId: 'B' as const, stage: 'T2' as const, ratingValue: 75,
       evidenceIdsSeen: ['B-t2-1', 'B-t2-2'], sealed: true as const,
@@ -181,9 +181,9 @@ describe('FormalGameScreen Stage 5 server state', () => {
       points: { total: 5, remaining: 4 }, evidenceUnlocks: [shallowB],
       ratings: [...t1Ratings, t2Rating], lastSequenceNo: 9,
     }} onExit={vi.fn()} />)
-    const choice = renderer.root.findByType(StageChoicePanel)
-    expect(choice.props.stage).toBe('T2')
-    expect(choice.props.title).toBe('证据初步核验后的选择')
+    expect(renderer.root.findAllByType(StageChoicePanel)
+      .filter((choice) => choice.props.stage === 'T2')).toHaveLength(0)
+    expect(renderer.root.findByType(FormalEvidencePanel).props.canUnlockDeep).toBe(true)
   })
 
   it('opens the Stage 6 final decision after T3 is sealed', () => {

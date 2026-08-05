@@ -40,4 +40,14 @@ describe('NikoChatPanel', () => {
     expect(html).toContain('你抓住了过程记录完整这个稳定信号。')
     expect(html).toContain('aria-live="polite"')
   })
+
+  it('uses neutral record-assistant copy and never renders evaluative avatars in formal mode', () => {
+    const html = renderToStaticMarkup(
+      <NikoChatPanel messages={messages} mode="formal" />,
+    )
+
+    expect(html).toContain('niko-chat-panel--neutral')
+    expect(html).not.toContain('/assets/niko-happy.png')
+    expect(html).not.toContain('/assets/niko-angry.png')
+  })
 })

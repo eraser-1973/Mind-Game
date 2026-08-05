@@ -236,9 +236,6 @@ async function requireLevelState(
     return { nextStage: 'T2' as const, sealedStages }
   }
 
-  if (!sealedStages.includes('T2')) {
-    throw conflict('T2_STAGE_CHOICE_REQUIRED', 'The T2 stage choice is required before deep verification.')
-  }
   if (sealedStages.includes('T3')) {
     throw conflict('T3_STAGE_ALREADY_SEALED', 'The T3 stage is already sealed.')
   }
@@ -257,7 +254,7 @@ async function requireLevelState(
 
 async function loadPublicEvidenceForEvent(db: D1Database, eventId: string) {
   const result = await db.prepare(`SELECT c.evidence_id, c.title, c.content,
-    c.polarity, i.item_order FROM evidence_event_items i
+    i.item_order FROM evidence_event_items i
     JOIN candidate_evidence_items c
       ON c.material_version = i.material_version AND c.evidence_id = i.evidence_id
     WHERE i.event_id = ? ORDER BY i.item_order`)
@@ -265,14 +262,12 @@ async function loadPublicEvidenceForEvent(db: D1Database, eventId: string) {
       evidence_id: string
       title: string
       content: string
-      polarity: 'positive' | 'negative'
       item_order: number
     }>()
   return result.results.map((row) => ({
     id: row.evidence_id,
     title: row.title,
     content: row.content,
-    polarity: row.polarity,
     order: row.item_order,
   }))
 }

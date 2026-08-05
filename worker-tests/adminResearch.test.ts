@@ -72,6 +72,22 @@ describe('research data collection administrator APIs', () => {
     const sessionsCsv = strFromU8(archive['sessions.csv']); expect(sessionsCsv).toContain("'=FORMULA"); expect(sessionsCsv).not.toMatch(/password|csrf|mg_admin/i)
   })
 
+  it('returns an administrator-only formal report with null metrics instead of invented scores', async () => {
+    const session = await seedSession('Report session', '13100131000')
+    const response = await request(`/api/admin/research/sessions/${session.sessionId}/report`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const body = await response.json() as { data: Record<string, unknown> }
+    expect(body.data).toMatchObject({
+      sessionSummary: { sessionId: session.sessionId, status: 'completed' },
+      stageChoices: { t1: null, t2: null, t3: null },
+      finalDecision: null,
+      pointSummary: null,
+      derivedMetrics: expect.any(Array),
+    })
+    expect(JSON.stringify(body)).not.toMatch(/fullName|studentId|phone|password|csrf|token/i)
+  })
+
   it('deletes only selected sessions, writes non-PII tombstones, and replays idempotently', async () => {
     const target = await seedSession('Delete target', '13900139000'); const survivor = await seedSession('Survivor', '13700137000'); const key = crypto.randomUUID(); const body = { confirmation: `DELETE SESSION ${target.sessionId}`, reasonCode: 'test_delete' }
     expect((await request(`/api/admin/research/sessions/${target.sessionId}`, { method: 'DELETE', body, key })).status).toBe(200)

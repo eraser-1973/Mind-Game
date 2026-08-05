@@ -366,6 +366,71 @@ async function choiceRows(db: D1Database, sessionId: string): Promise<ChoiceRow[
   return result.results
 }
 
+/**
+ * T2 no longer collects a candidate choice. A participant may proceed to the
+ * final decision only once every actually shallow-verified candidate has a
+ * sealed T2 rating and the server confirms that a deep verification cannot be
+ * afforded from the session's pinned point rule.
+ */
+async function canFinalizeAtT2WithoutChoice(
+  db: D1Database,
+  session: AuthenticatedSession,
+  run: Pick<RunRow, 'current_stage' | 'points_remaining'>,
+): Promise<boolean> {
+  if (run.current_stage !== 'T2') return false
+  const [rule, counts] = await Promise.all([
+    db.prepare(`SELECT deep_cost,status FROM point_rules WHERE point_rule_version=?`)
+      .bind(session.pointRuleVersion).first<{ deep_cost: number; status: string }>(),
+    db.prepare(`SELECT
+      (SELECT COUNT(DISTINCT candidate_id) FROM evidence_events
+        WHERE session_id=? AND evidence_level='shallow') AS shallow_count,
+      (SELECT COUNT(DISTINCT r.candidate_id) FROM stage_ratings r
+        JOIN evidence_events e ON e.session_id=r.session_id
+          AND e.candidate_id=r.candidate_id AND e.evidence_level='shallow'
+        WHERE r.session_id=? AND r.stage='T2') AS t2_rated_count,
+      (SELECT COUNT(*) FROM evidence_events
+        WHERE session_id=? AND evidence_level='deep') AS deep_count`)
+      .bind(session.sessionId, session.sessionId, session.sessionId)
+      .first<{ shallow_count: number; t2_rated_count: number; deep_count: number }>(),
+  ])
+  return rule?.status === 'published' &&
+    Number.isInteger(rule.deep_cost) &&
+    run.points_remaining < rule.deep_cost &&
+    (counts?.shallow_count ?? 0) > 0 &&
+    counts?.shallow_count === counts?.t2_rated_count &&
+    (counts?.deep_count ?? 0) === 0
+}
+
+export async function loadFinalDecisionAvailability(
+  db: D1Database,
+  session: AuthenticatedSession,
+  run: Pick<RunRow, 'current_stage' | 'points_remaining' | 'started_at' | 'deadline_at'>,
+) {
+  const [choices, sunk, final] = await Promise.all([
+    choiceRows(db, session.sessionId),
+    findSunk(db, session.sessionId),
+    findFinal(db, session.sessionId),
+  ])
+  const sealed = choices.map(({ stage }) => stage)
+  const stageStatus = run.current_stage === 'DECISION'
+    ? 'DECISION_COMPLETE'
+    : deriveFormalStageStatus(run.current_stage, sealed)
+  return deriveFinalDecisionEligibility({
+    stageStatus,
+    sunkChoice: sunk?.choice === 'continue' || sunk?.choice === 'stop_loss' || sunk?.choice === 'give_up'
+      ? sunk.choice : null,
+    hasT1Choice: sealed.includes('T1'),
+    hasT2Choice: sealed.includes('T2'),
+    hasT3Choice: sealed.includes('T3'),
+    canFinalizeAtT2: await canFinalizeAtT2WithoutChoice(db, session, run),
+    sunkResponsePending: sunk?.choice_status === 'pending',
+    finalSubmitted: Boolean(final),
+    completionStatus: session.completionStatus,
+    currentStep: session.currentStep,
+    expired: createGameClockSnapshot(run.started_at, run.deadline_at).expired,
+  })
+}
+
 function latestChoice(rows: ChoiceRow[]): ChoiceRow | null {
   return rows.find(({ stage }) => stage === 'T3') ??
     rows.find(({ stage }) => stage === 'T2') ??
@@ -495,20 +560,8 @@ export async function saveActiveFinalDecision(
     throw conflict('GAME_EXPIRED', 'The formal game time has expired.')
   }
   if (!displayOrder(session).includes(input.candidateId)) throw conflict('CANDIDATE_NOT_IN_SESSION', 'Invalid candidate.')
-  const choices = await choiceRows(db, session.sessionId)
   const sunk = await findSunk(db, session.sessionId)
-  const sealed = choices.map(({ stage }) => stage)
-  const stageStatus = run.current_stage === 'DECISION'
-    ? 'DECISION_COMPLETE'
-    : deriveFormalStageStatus(run.current_stage, sealed)
-  const result = deriveFinalDecisionEligibility({
-    stageStatus,
-    sunkChoice: sunk?.choice === 'continue' || sunk?.choice === 'stop_loss' || sunk?.choice === 'give_up'
-      ? sunk.choice : null,
-    hasT1Choice: sealed.includes('T1'), hasT2Choice: sealed.includes('T2'), hasT3Choice: sealed.includes('T3'),
-    sunkResponsePending: sunk?.choice_status === 'pending', finalSubmitted: false,
-    completionStatus: session.completionStatus, currentStep: session.currentStep, expired: false,
-  })
+  const result = await loadFinalDecisionAvailability(db, session, run)
   if (!result.allowed || !result.sourceStage) throw conflict(result.reason ?? 'FINAL_NOT_AVAILABLE', 'The final decision is not available.')
 
   if (!sunk) {

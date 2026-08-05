@@ -4,11 +4,13 @@ import { formatTime } from '../utils/time'
 const avatarByMood: Record<NikoMood, string> = {
   happy: '/assets/niko-happy.png',
   angry: '/assets/niko-angry.png',
+  neutral: '',
 }
 
 const moodLabel: Record<NikoMood, string> = {
   happy: '开心',
   angry: '愤怒',
+  neutral: '记录',
 }
 
 type Props = {
@@ -18,13 +20,17 @@ type Props = {
 export function NikoMessageBubble({ message }: Props) {
   return (
     <article className={`niko-message niko-message--${message.mood}`}>
-      <img
-        className="niko-message__avatar"
-        src={avatarByMood[message.mood]}
-        alt={`Niko ${moodLabel[message.mood]}`}
-        width="40"
-        height="40"
-      />
+      {message.mood === 'neutral' ? (
+        <span className="niko-message__avatar niko-message__avatar--neutral" aria-label="Niko 记录助手">N</span>
+      ) : (
+        <img
+          className="niko-message__avatar"
+          src={avatarByMood[message.mood]}
+          alt={`Niko ${moodLabel[message.mood]}`}
+          width="40"
+          height="40"
+        />
+      )}
       <div className="niko-message__body">
         <header>
           <strong>Niko</strong>

@@ -27,7 +27,7 @@ describe('formal evidence API client', () => {
       stageStatus: `${currentStage}_ACTIVE`,
       evidence: [{
         id: level === 'shallow' ? 'A-t2-1' : 'A-t3-1',
-        title: '材料标题', content: '材料正文', polarity: 'negative', order: 1,
+        title: '材料标题', content: '材料正文', order: 1,
       }],
     }, 201))
     const result = await unlockFormalEvidence({
@@ -53,6 +53,20 @@ describe('formal evidence API client', () => {
       serverAt: '2026-08-01T00:01:00.000Z', points: { before: 5, cost: 1, after: 4, total: 5 },
       currentStage: 'T2', stageStatus: 'T2_ACTIVE',
       evidence: [{ id: 'A-t2-1', isKeyRisk: true }],
+    }))
+    await expect(unlockFormalEvidence({
+      sessionId: 'session-1', candidateId: 'A', level: 'shallow',
+      clientAt: '2026-08-01T00:00:00.000Z',
+    }, 'event-evidence', fetcher)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  })
+
+  it('rejects leaked evidence direction metadata in formal mode', async () => {
+    const fetcher = vi.fn(async () => envelope({
+      created: true, alreadyUnlocked: false, sessionId: 'session-1',
+      candidateId: 'A', level: 'shallow', ratingStage: 'T2', sequenceNo: 8,
+      serverAt: '2026-08-01T00:01:00.000Z', points: { before: 5, cost: 1, after: 4, total: 5 },
+      currentStage: 'T2', stageStatus: 'T2_ACTIVE',
+      evidence: [{ id: 'A-t2-1', title: '材料', content: '正文', order: 1, polarity: 'negative' }],
     }))
     await expect(unlockFormalEvidence({
       sessionId: 'session-1', candidateId: 'A', level: 'shallow',

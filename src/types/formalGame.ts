@@ -66,7 +66,6 @@ export type FormalEvidenceItem = {
   id: string
   title: string
   content: string
-  polarity: 'positive' | 'negative'
   order: number
 }
 
@@ -95,6 +94,12 @@ export type FormalGameSnapshot = {
   ratings: FormalRating[]
   stageChoice: FormalStageChoice | null
   stageChoices: FormalStageChoice[]
+  /** Server-derived workflow eligibility; it reveals no candidate assessment. */
+  finalDecisionAvailability?: {
+    available: boolean
+    sourceStage: 'T1' | 'T2' | 'T3' | null
+    reason: string | null
+  }
   evidenceUnlocks: FormalEvidenceUnlock[]
   lastSequenceNo?: number
   sunkCost?: FormalSunkCostSnapshot | null
@@ -116,6 +121,7 @@ export type FormalRatingResponse = FormalRating & {
   requiredCandidateCount: number
   allStageRated: boolean
   allT1Rated: boolean
+  finalDecisionAvailability?: NonNullable<FormalGameSnapshot['finalDecisionAvailability']>
 }
 
 export type FormalStageChoiceResponse = FormalStageChoice & {

@@ -4,17 +4,22 @@ import { NikoMessageBubble } from './NikoMessageBubble'
 
 type Props = {
   messages: NikoMessage[]
+  mode?: 'quick' | 'formal'
 }
 
-export function NikoChatPanel({ messages }: Props) {
+export function NikoChatPanel({ messages, mode = 'quick' }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
+  const neutralMode = mode === 'formal'
+  const displayedMessages = neutralMode
+    ? messages.map((message) => ({ ...message, mood: 'neutral' as const }))
+    : messages
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, messages.at(-1)?.timestamp])
+  }, [displayedMessages.length, displayedMessages.at(-1)?.timestamp])
 
   return (
-    <aside className="niko-chat-panel panel">
+    <aside className={`niko-chat-panel panel${neutralMode ? ' niko-chat-panel--neutral' : ''}`}>
       <div className="niko-chat-panel__heading">
         <div>
           <span className="eyebrow">即时反馈</span>
@@ -24,9 +29,11 @@ export function NikoChatPanel({ messages }: Props) {
       </div>
       <div className="niko-chat-stream" aria-live="polite">
         <div className="niko-welcome">
-          Niko会根据你对证据的判断，实时给出反馈。
+          {neutralMode
+            ? 'Niko 会记录你对当前材料作出的评分调整。'
+            : 'Niko会根据你对证据的判断，实时给出反馈。'}
         </div>
-        {messages.map((message) => (
+        {displayedMessages.map((message) => (
           <NikoMessageBubble key={message.id} message={message} />
         ))}
         <div ref={endRef} />

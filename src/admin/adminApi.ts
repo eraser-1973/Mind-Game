@@ -7,6 +7,7 @@ import type {
   AdminRuleDetail,
   AdminResearchPage,
   AdminResearchSession,
+  AdminFormalAssessmentReport,
 } from './adminTypes'
 import { readAdminCsrfToken } from './adminCsrf'
 
@@ -144,6 +145,7 @@ async function researchWrite<T>(path: string, method: 'POST' | 'DELETE', body: u
 export const adminResearchApi = {
   listSessions: (cursor: string | null = null) => configGet<AdminResearchPage>(`/api/admin/research/sessions?pageSize=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
   getSession: (sessionId: string) => configGet<AdminResearchSession>(`/api/admin/research/sessions/${encodeURIComponent(sessionId)}`),
+  getFormalReport: (sessionId: string) => configGet<AdminFormalAssessmentReport>(`/api/admin/research/sessions/${encodeURIComponent(sessionId)}/report`),
   exportAll: async () => {
     const token = readAdminCsrfToken(); if (!token) throw new AdminApiError(403, 'ADMIN_CSRF_REJECTED', '绠＄悊鍛樺畨鍏ㄤ护鐗岀己澶便€?', '')
     const response = await fetch('/api/admin/research/exports', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: '{}' })

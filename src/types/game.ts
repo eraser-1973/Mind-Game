@@ -26,7 +26,7 @@ export type CandidateDisplayOrder = [
 ]
 export type EvidencePolarity = 'positive' | 'negative'
 export type RatingDirection = 'higher' | 'lower'
-export type NikoMood = 'happy' | 'angry'
+export type NikoMood = 'happy' | 'angry' | 'neutral'
 export type ResearchStep =
   | 'consent'
   | 'identity'

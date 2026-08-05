@@ -199,6 +199,91 @@ async function sessionDetail(request: Request, env: Env, requestId: string, sess
   return adminSuccessResponse({ sessionId: row.session_id, participantId: row.participant_id, identity: maskIdentity(row), status: row.completion_status, currentStep: row.current_step, startedAt: row.started_at, endedAt: row.ended_at, completionType: row.final_submit_mode, taskVersion: row.task_version, materialVersion: row.material_version, configVersion: row.config_set_id, qualityFlags: qualityFlags(row) }, requestId)
 }
 
+function stageChoiceForReport(rows: Array<Record<string, unknown>>, stage: string) {
+  const row = rows.find((item) => item.stage === stage)
+  return row ? {
+    candidateId: row.candidateId,
+    confidence: row.confidence,
+    submittedAt: row.submittedAt,
+  } : null
+}
+
+async function sessionReport(request: Request, env: Env, requestId: string, sessionId: string): Promise<Response> {
+  await authenticateAdmin(request, env, { requestId })
+  if (!UUID.test(sessionId)) throw new ResearchRequestError(400, 'SESSION_ID_INVALID', 'The session ID is invalid.')
+  const session = await env.DB.prepare(`SELECT session_id,completion_status,current_step,started_at,ended_at,
+    final_submit_mode,config_set_id,task_version,material_version,point_rule_version,sunk_cost_rule_version,
+    scoring_version,benchmark_version,norm_version,reliability_version
+    FROM sessions WHERE session_id=?`).bind(sessionId).first<Record<string, string | null>>()
+  if (!session) throw new ResearchRequestError(404, 'SESSION_NOT_FOUND', 'The session does not exist.')
+
+  const [ratings, choices, evidence, ledger, finalDecision, sunkCost, gameRun, metrics, candidates] = await Promise.all([
+    selectRows(env.DB, `SELECT candidate_id AS candidateId,stage,rating_value AS ratingValue,
+      server_submitted_at AS submittedAt,sequence_no AS sequenceNo
+      FROM stage_ratings WHERE session_id=? ORDER BY sequence_no`, [sessionId]),
+    selectRows(env.DB, `SELECT stage,candidate_id AS candidateId,confidence,
+      server_submitted_at AS submittedAt,sequence_no AS sequenceNo
+      FROM stage_choices WHERE session_id=? ORDER BY sequence_no`, [sessionId]),
+    selectRows(env.DB, `SELECT candidate_id AS candidateId,evidence_level AS evidenceLevel,
+      points_before AS pointsBefore,points_cost AS pointsCost,points_after AS pointsAfter,
+      contains_key_risk AS containsKeyRisk,server_at AS unlockedAt,sequence_no AS sequenceNo
+      FROM evidence_events WHERE session_id=? ORDER BY sequence_no`, [sessionId]),
+    selectRows(env.DB, `SELECT candidate_id AS candidateId,evidence_level AS evidenceLevel,
+      points_before AS pointsBefore,points_delta AS pointsDelta,points_after AS pointsAfter,
+      sequence_no AS sequenceNo,created_at AS createdAt
+      FROM point_ledger WHERE session_id=? ORDER BY sequence_no`, [sessionId]),
+    env.DB.prepare(`SELECT candidate_id AS candidateId,confidence,submit_mode AS submitMode,
+      source_stage AS sourceStage,selection_origin AS selectionOrigin,auto_selected AS autoSelected,
+      server_submitted_at AS submittedAt,remaining_sec_at_submit AS remainingSec,
+      points_remaining_at_submit AS pointsRemaining
+      FROM final_decisions WHERE session_id=?`).bind(sessionId).first<Record<string, unknown>>(),
+    env.DB.prepare(`SELECT target_candidate_id AS targetCandidateId,trigger_reason AS triggerReason,
+      shown_at AS shownAt,choice,choice_submitted_at AS choiceSubmittedAt,
+      points_invested_before AS pointsInvestedBefore,choice_status AS choiceStatus
+      FROM sunk_cost_events WHERE session_id=?`).bind(sessionId).first<Record<string, unknown>>(),
+    env.DB.prepare(`SELECT points_total AS totalPoints,points_remaining AS remainingPoints,
+      current_stage AS currentStage,started_at AS startedAt,deadline_at AS deadlineAt,
+      time_expired_at AS timeExpiredAt FROM game_runs WHERE session_id=?`).bind(sessionId).first<Record<string, unknown>>(),
+    selectRows(env.DB, `SELECT v.metric_code AS metricCode,v.numeric_value AS numericValue,
+      v.calculation_status AS calculationStatus,v.missing_reason AS missingReason,
+      v.computed_at AS computedAt FROM scoring_runs r JOIN derived_metric_values v
+      ON v.scoring_run_id=r.scoring_run_id WHERE r.session_id=? AND r.is_current=1
+      ORDER BY v.metric_code`, [sessionId]),
+    selectRows(env.DB, `SELECT p.candidate_id AS candidateId,p.name,p.role,
+      b.benchmark_value AS benchmarkValue FROM candidate_material_profiles p
+      LEFT JOIN benchmark_candidate_values b ON b.benchmark_version=? AND b.candidate_id=p.candidate_id
+      WHERE p.material_version=? ORDER BY p.display_order`, [session.benchmark_version, session.material_version]),
+  ])
+
+  const pointSummary = gameRun ? {
+    totalPoints: gameRun.totalPoints,
+    remainingPoints: gameRun.remainingPoints,
+    usedPoints: Number(gameRun.totalPoints) - Number(gameRun.remainingPoints),
+    shallowCount: evidence.filter((item) => item.evidenceLevel === 'shallow').length,
+    deepCount: evidence.filter((item) => item.evidenceLevel === 'deep').length,
+  } : null
+  return adminSuccessResponse({
+    sessionSummary: {
+      sessionId: session.session_id, status: session.completion_status, currentStep: session.current_step,
+      startedAt: session.started_at, completedAt: session.ended_at, completionType: session.final_submit_mode,
+    },
+    versions: {
+      config: session.config_set_id, task: session.task_version, material: session.material_version,
+      pointRule: session.point_rule_version, sunkCostRule: session.sunk_cost_rule_version,
+      scoring: session.scoring_version, benchmark: session.benchmark_version,
+      norm: session.norm_version, reliability: session.reliability_version,
+    },
+    stageChoices: { t1: stageChoiceForReport(choices, 'T1'), t2: stageChoiceForReport(choices, 'T2'), t3: stageChoiceForReport(choices, 'T3') },
+    finalDecision: finalDecision ?? null,
+    stageRatings: ratings,
+    evidenceSummary: { sequence: evidence, pointLedger: ledger },
+    pointSummary,
+    sunkCostSummary: sunkCost ?? null,
+    derivedMetrics: metrics,
+    candidateSummaries: candidates,
+  }, requestId)
+}
+
 async function exportResearch(request: Request, env: Env, requestId: string): Promise<Response> {
   const admin = await authenticateAdmin(request, env, { requestId }); await requireAdminCsrf(request, admin)
   const body = await readJson(request); if (Object.keys(body).some((key) => !['status', 'startedFrom', 'startedTo'].includes(key))) throw new ResearchRequestError(400, 'RESEARCH_REQUEST_INVALID', 'The export request contains unknown fields.')
@@ -243,6 +328,8 @@ export async function handleAdminResearch(request: Request, env: Env, requestId:
   try {
     const path = new URL(request.url).pathname
     if (request.method === 'GET' && path === '/api/admin/research/sessions') return await listSessions(request, env, requestId)
+    const report = path.match(/^\/api\/admin\/research\/sessions\/([^/]+)\/report$/)
+    if (request.method === 'GET' && report) return await sessionReport(request, env, requestId, report[1])
     const detail = path.match(/^\/api\/admin\/research\/sessions\/([^/]+)$/)
     if (request.method === 'GET' && detail) return await sessionDetail(request, env, requestId, detail[1])
     if (request.method === 'POST' && path === '/api/admin/research/exports') return await exportResearch(request, env, requestId)

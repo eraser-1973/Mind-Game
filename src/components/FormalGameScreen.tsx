@@ -13,10 +13,11 @@ import type {
   PublicCandidateId,
   PublicCandidateProfile,
 } from '../types/game'
-import { createNikoFeedbackFromEvidence } from '../utils/nikoFeedback'
+import { createFormalNikoFeedback } from '../utils/formalNikoFeedback'
 import { CandidateList } from './CandidateList'
 import { FormalCandidateDetail } from './FormalCandidateDetail'
 import { FormalEvidencePanel } from './FormalEvidencePanel'
+import { FormalDecisionTimeline } from './FormalDecisionTimeline'
 import { FormalRatingPanel } from './FormalRatingPanel'
 import { FormalSunkCostModal } from './FormalSunkCostModal'
 import { FormalFinalDecisionPanel } from './FormalFinalDecisionPanel'
@@ -211,7 +212,8 @@ export function FormalGameScreen({
 
   const mustDecide = snapshot.stageStatus === 'T3_COMPLETE' ||
     snapshot.stageStatus === 'DECISION_COMPLETE' ||
-    (snapshot.stageStatus === 'T2_COMPLETE' && snapshot.points.remaining < 3)
+    snapshot.finalDecisionAvailability?.available === true ||
+    (snapshot.stageStatus === 'T2_COMPLETE' && snapshot.stageChoices.some(({ stage }) => stage === 'T2'))
   if (mustDecide || showFinalDecision) {
     const canSubmit = finalCandidateId !== null && finalConfidenceTouched &&
       controller.stage6Pending !== 'final'
@@ -239,29 +241,8 @@ export function FormalGameScreen({
 
   const shallowUnlocks = snapshot.evidenceUnlocks.filter(({ level }) => level === 'shallow')
   const deepUnlocks = snapshot.evidenceUnlocks.filter(({ level }) => level === 'deep')
-  const t2Ready = shallowUnlocks.length > 0 && shallowUnlocks.every(({ candidateId }) =>
-    snapshot.ratings.some((rating) => rating.candidateId === candidateId && rating.stage === 'T2'))
   const t3Ready = deepUnlocks.length > 0 && deepUnlocks.every(({ candidateId }) =>
     snapshot.ratings.some((rating) => rating.candidateId === candidateId && rating.stage === 'T3'))
-
-  if (snapshot.stageStatus === 'T2_ACTIVE' && t2Ready) {
-    return (
-      <main className="game-screen formal-stage-screen">
-        <TimerBar timeLeftSec={controller.remainingSec} durationSec={900} elapsedSec={elapsedSec} availablePoints={snapshot.points.remaining} mode="formal" />
-        <StageChoicePanel
-          candidates={orderedCandidates}
-          stage="T2"
-          title="证据初步核验后的选择"
-          description="请根据当前已解锁材料，记录此刻的首选候选人与决策信心。"
-          submitHint="提交后将结束浅度查证阶段，不能继续浅查或修改 T2。"
-          pending={controller.choicePending}
-          disabled={controller.expired}
-          error={controller.choiceError}
-          onSubmit={(candidateId, confidence) => void controller.submitChoice('T2', candidateId, confidence)}
-        />
-      </main>
-    )
-  }
 
   if (snapshot.stageStatus === 'T3_ACTIVE' && t3Ready) {
     return (
@@ -289,34 +270,29 @@ export function FormalGameScreen({
   const t2Rating = snapshot.ratings.find((item) => item.candidateId === selectedId && item.stage === 'T2')
   const t3Rating = snapshot.ratings.find((item) => item.candidateId === selectedId && item.stage === 'T3')
   const selectedT1Rating = snapshot.ratings.find((item) => item.candidateId === selectedId && item.stage === 'T1')
-  const t2ChoiceSaved = snapshot.stageChoices.some(({ stage }) => stage === 'T2')
   const t3ChoiceSaved = snapshot.stageChoices.some(({ stage }) => stage === 'T3')
-  const canUnlockShallow = !shallowUnlock && !t2ChoiceSaved &&
+  const canUnlockShallow = !shallowUnlock &&
     (snapshot.stageStatus === 'T1_COMPLETE' || snapshot.stageStatus === 'T2_ACTIVE') &&
     snapshot.points.remaining >= 1
-  const canUnlockDeep = !deepUnlock && t2ChoiceSaved && !t3ChoiceSaved &&
+  const canUnlockDeep = !deepUnlock && !t3ChoiceSaved &&
     Boolean(shallowUnlock && t2Rating) &&
-    (snapshot.stageStatus === 'T2_COMPLETE' || snapshot.stageStatus === 'T3_ACTIVE') &&
+    (snapshot.stageStatus === 'T2_ACTIVE' || snapshot.stageStatus === 'T3_ACTIVE') &&
     snapshot.points.remaining >= 3
   const pendingEvidence = controller.pendingEvidence?.endsWith(`:${selectedId}`)
     ? controller.pendingEvidence.split(':')[0] as FormalEvidenceLevel
     : null
   const currentRatingStage: FormalRatingStage | null = deepUnlock && !t3ChoiceSaved
     ? 'T3'
-    : shallowUnlock && !t2ChoiceSaved ? 'T2' : null
+    : shallowUnlock ? 'T2' : null
 
   const handleRating = async (stage: 'T2' | 'T3', value: number) => {
-    const baseline = snapshot.ratings.find((rating) =>
-      rating.candidateId === selectedId && rating.stage === (stage === 'T2' ? 'T1' : 'T2'))
     const unlock = stage === 'T2' ? shallowUnlock : deepUnlock
     const result = await controller.submitRating(selectedId, stage, value)
     const evidence = unlock?.evidence[0]
-    if (!result || !baseline || !evidence) return
-    const message = createNikoFeedbackFromEvidence({
+    if (!result || !evidence) return
+    const message = createFormalNikoFeedback({
       candidateId: selectedId,
       stage,
-      baseline: baseline.ratingValue,
-      value: result.ratingValue,
       evidence,
       timestamp: elapsedSec,
     })
@@ -346,13 +322,13 @@ export function FormalGameScreen({
             shallowError={controller.operationErrors[`shallow:${selectedId}`]}
             deepError={controller.operationErrors[`deep:${selectedId}`]}
             deepDisabledReason={
-              !t2ChoiceSaved ? '提交 T2 阶段选择后开放' :
               !shallowUnlock ? '需先完成该候选人的浅度查证' :
               !t2Rating ? '需先封存该候选人的 T2 评分' :
               snapshot.points.remaining < 3 ? '剩余点数不足 3 点' : null
             }
             onUnlock={(level) => controller.unlockEvidence(selectedId, level)}
           />
+          <FormalDecisionTimeline stageChoices={snapshot.stageChoices} finalDecision={controller.finalDecision} />
           {currentRatingStage && <FormalRatingPanel
             candidateId={selectedId}
             stage={currentRatingStage}
@@ -365,13 +341,13 @@ export function FormalGameScreen({
         </FormalCandidateDetail>
         <div className="feedback-rail">
           <HRChatPanel chats={[]} elapsedSec={elapsedSec} />
-          <NikoChatPanel messages={nikoMessages} />
+          <NikoChatPanel messages={nikoMessages} mode="formal" />
         </div>
       </div>
       <footer className="action-dock">
         <div><span className="eyebrow">当前任务</span><strong>可以用查证点数，比较证据并锁定阶段判断。</strong></div>
         <span className="formal-stage-chip">{snapshot.stageStatus}</span>
-        {snapshot.stageStatus === 'T2_COMPLETE' && (
+        {snapshot.finalDecisionAvailability?.available && (
           <button className="button button--primary button--compact" onClick={() => setShowFinalDecision(true)}>
             进入最终决策
           </button>

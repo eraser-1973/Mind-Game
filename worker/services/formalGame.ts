@@ -26,7 +26,11 @@ import {
   loadEvidenceUnlockRows,
   projectEvidenceUnlockForResume,
 } from './formalEvidence'
-import { assertNoPendingSunkCost, finalizeExpiredFormalGame } from './sunkCostFinal'
+import {
+  assertNoPendingSunkCost,
+  finalizeExpiredFormalGame,
+  loadFinalDecisionAvailability,
+} from './sunkCostFinal'
 import { loadSafeFinalDecision, loadSafeSunkCost } from './sunkCostFinal'
 import { loadCompletionProjection } from './formalCompletion'
 
@@ -230,10 +234,11 @@ async function projectRun(
     run.points_remaining > run.points_total
   ) throw failed('SESSION_DATA_INTEGRITY_ERROR', 'The formal game state is internally inconsistent.')
 
-  const [ratings, choices, unlockRows] = await Promise.all([
+  const [ratings, choices, unlockRows, finalDecisionAvailability] = await Promise.all([
     loadRatings(db, session.sessionId),
     loadChoices(db, session.sessionId),
     loadEvidenceUnlockRows(db, session.sessionId),
+    loadFinalDecisionAvailability(db, session, run),
   ])
   const clock = createGameClockSnapshot(run.started_at, run.deadline_at, serverNow)
   const stageChoices = choices.map(choiceProjection)
@@ -255,6 +260,11 @@ async function projectRun(
     ratings: ratings.map(ratingProjection),
     stageChoice: t1Choice,
     stageChoices,
+    finalDecisionAvailability: {
+      available: finalDecisionAvailability.allowed,
+      sourceStage: finalDecisionAvailability.sourceStage,
+      reason: finalDecisionAvailability.reason,
+    },
     evidenceUnlocks: await Promise.all(
       unlockRows.map((row) => projectEvidenceUnlockForResume(db, row)),
     ),
@@ -364,6 +374,7 @@ function startProjection(
     ratings: game.ratings,
     stageChoice: game.stageChoice,
     stageChoices: game.stageChoices,
+    finalDecisionAvailability: game.finalDecisionAvailability,
     evidenceUnlocks: game.evidenceUnlocks,
   }
 }
@@ -500,11 +511,19 @@ async function requiredRatingCount(db: D1Database, sessionId: string, stage: For
   return row?.count ?? 0
 }
 
-async function ratingResponse(db: D1Database, row: RatingRow, created: boolean) {
-  const [ratedCandidateCount, requiredCandidateCount] = await Promise.all([
+async function ratingResponse(
+  db: D1Database,
+  session: AuthenticatedSession,
+  row: RatingRow,
+  created: boolean,
+) {
+  const [ratedCandidateCount, requiredCandidateCount, run] = await Promise.all([
     ratingCount(db, row.session_id, row.stage),
     requiredRatingCount(db, row.session_id, row.stage),
+    findRun(db, row.session_id),
   ])
+  if (!run) throw failed()
+  const availability = await loadFinalDecisionAvailability(db, session, run)
   return {
     created,
     sessionId: row.session_id,
@@ -513,6 +532,11 @@ async function ratingResponse(db: D1Database, row: RatingRow, created: boolean) 
     requiredCandidateCount,
     allStageRated: requiredCandidateCount > 0 && ratedCandidateCount === requiredCandidateCount,
     allT1Rated: row.stage === 'T1' && ratedCandidateCount === 5,
+    finalDecisionAvailability: {
+      available: availability.allowed,
+      sourceStage: availability.sourceStage,
+      reason: availability.reason,
+    },
   }
 }
 
@@ -526,7 +550,7 @@ export async function saveFormalRating(
     if (replay.session_id !== session.sessionId) {
       throw conflict('IDEMPOTENCY_CONFLICT', 'The idempotency key cannot be reused.')
     }
-    return ratingResponse(db, replay, false)
+    return ratingResponse(db, session, replay, false)
   }
   if (await eventOwner(db, input.eventId)) {
     throw conflict('IDEMPOTENCY_CONFLICT', 'The idempotency key cannot be reused.')
@@ -577,11 +601,11 @@ export async function saveFormalRating(
       ])
       const row = await findRatingByEvent(db, input.eventId)
       if (!row) throw failed()
-      return ratingResponse(db, row, true)
+      return ratingResponse(db, session, row, true)
     } catch {
       const replayAfterRace = await findRatingByEvent(db, input.eventId)
       if (replayAfterRace?.session_id === session.sessionId) {
-        return ratingResponse(db, replayAfterRace, false)
+        return ratingResponse(db, session, replayAfterRace, false)
       }
       if (await findRating(db, session.sessionId, input.candidateId, input.stage)) {
         throw conflict('RATING_ALREADY_SEALED', 'This stage rating is already sealed.')
@@ -658,6 +682,9 @@ export async function saveFormalStageChoice(
   }
   if (await eventOwner(db, input.eventId)) {
     throw conflict('IDEMPOTENCY_CONFLICT', 'The idempotency key cannot be reused.')
+  }
+  if (input.stage === 'T2') {
+    throw conflict('T2_STAGE_CHOICE_REMOVED', 'The T2 stage no longer collects a candidate choice.')
   }
   if (await findChoice(db, session.sessionId, input.stage)) {
     throw conflict('STAGE_CHOICE_ALREADY_SEALED', 'This stage choice is already sealed.')

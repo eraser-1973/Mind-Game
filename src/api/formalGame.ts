@@ -87,9 +87,8 @@ function parseEvidenceItem(value: unknown): FormalEvidenceItem | null {
     typeof value.id !== 'string' || !value.id ||
     typeof value.title !== 'string' || !value.title ||
     typeof value.content !== 'string' || !value.content ||
-    (value.polarity !== 'positive' && value.polarity !== 'negative') ||
     !Number.isInteger(value.order) || (value.order as number) < 1 ||
-    Object.keys(value).some((key) => !['id', 'title', 'content', 'polarity', 'order'].includes(key))
+    Object.keys(value).some((key) => !['id', 'title', 'content', 'order'].includes(key))
   ) return null
   return value as FormalEvidenceItem
 }
@@ -138,7 +137,14 @@ function parseSnapshotFields(value: Record<string, unknown>): boolean {
     !isRecord(value.points) || !Array.isArray(value.ratings) ||
     !Array.isArray(value.stageChoices) || !Array.isArray(value.evidenceUnlocks)
   ) return false
-  return (
+  const availability = value.finalDecisionAvailability
+  const validAvailability = availability === undefined || (
+    isRecord(availability) &&
+    typeof availability.available === 'boolean' &&
+    [null, 'T1', 'T2', 'T3'].includes(availability.sourceStage as string | null) &&
+    (availability.reason === null || typeof availability.reason === 'string')
+  )
+  return validAvailability && (
     value.durationSec === 900 &&
     isIso(value.startedAt) && isIso(value.deadlineAt) && isIso(value.serverNow) &&
     Number.isInteger(value.remainingSec) && (value.remainingSec as number) >= 0 &&

@@ -113,11 +113,12 @@ describe('formal shallow evidence unlock', () => {
       currentStage: 'T2',
       stageStatus: 'T2_ACTIVE',
       evidence: [
-        { id: 'A-t2-1', order: 1, polarity: 'negative' },
-        { id: 'A-t2-2', order: 2, polarity: 'negative' },
+        { id: 'A-t2-1', order: 1 },
+        { id: 'A-t2-2', order: 2 },
       ],
     })
     const serialized = JSON.stringify(payload)
+    expect(serialized).not.toContain('polarity')
     for (const privateKey of [
       'isKeyRisk', 'containsKeyRisk', 'trueAbility', 'trueFit', 'isToxic',
       'riskFlags', 'baselineFitScore', 'identity', 'tokenHash',

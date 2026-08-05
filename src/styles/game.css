@@ -1606,6 +1606,16 @@ p {
   background: rgba(34, 137, 177, 0.1);
 }
 
+.niko-message__avatar--neutral {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--cyan) 18%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line));
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .decision-card.is-selected {
   border: 2px solid var(--cyan);
   background: rgba(34, 137, 177, 0.13);
@@ -1722,6 +1732,27 @@ p {
 
 .formal-evidence-card strong { font-size: 0.78rem; }
 .formal-evidence-card p { margin: 0; color: var(--muted); font-size: 0.67rem; line-height: 1.65; }
+
+.formal-decision-timeline {
+  margin-top: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--panel) 86%, #000);
+  padding: 0.72rem 0.82rem;
+}
+
+.formal-decision-timeline ul { margin: 0.45rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.32rem; }
+.formal-decision-timeline li { color: var(--muted); font-size: 0.7rem; }
+
+.admin-formal-report { display: grid; gap: 0.8rem; }
+.admin-formal-report__header, .admin-formal-report__section { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.85rem; background: var(--panel); }
+.admin-formal-report__header h2, .admin-formal-report__section h3 { margin: 0.2rem 0 0.5rem; }
+.admin-formal-report__header p, .admin-formal-report__section p, .admin-formal-report__section li { color: var(--muted); font-size: 0.78rem; }
+.admin-formal-report__section ul { margin: 0; padding-left: 1.15rem; display: grid; gap: 0.25rem; }
+.admin-formal-report__section table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.admin-formal-report__section th, .admin-formal-report__section td { padding: 0.35rem; border-bottom: 1px solid var(--line); text-align: left; }
+.admin-formal-report__metrics { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.admin-formal-report__metrics article { min-width: 7rem; border: 1px solid var(--line); padding: 0.55rem; display: grid; gap: 0.18rem; }
 
 .formal-rating-panel {
   padding: 1.2rem 1.4rem;

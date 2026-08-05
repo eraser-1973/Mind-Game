@@ -43,6 +43,7 @@ function snapshotFromStart(result: FormalGameStartResponse): FormalGameSnapshot 
     ratings: result.ratings,
     stageChoice: result.stageChoice,
     stageChoices: result.stageChoices,
+    finalDecisionAvailability: result.finalDecisionAvailability,
     evidenceUnlocks: result.evidenceUnlocks,
     sunkCost: null,
     finalDecision: null,
@@ -168,6 +169,7 @@ export function useFormalGameController({
             serverSubmittedAt: result.serverSubmittedAt,
           },
         ].sort((left, right) => left.sequenceNo - right.sequenceNo),
+        finalDecisionAvailability: result.finalDecisionAvailability ?? current.finalDecisionAvailability,
         lastSequenceNo: result.sequenceNo,
       } : current)
       return result
