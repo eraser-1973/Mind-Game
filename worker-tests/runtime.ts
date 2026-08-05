@@ -60,6 +60,7 @@ export async function createWorkerRuntime(options?: {
   const runtime = new Miniflare({
     compatibilityDate: '2026-07-01',
     d1Databases: ['DB'],
+    bindings: { TOMBSTONE_HASH_SECRET: 'test-only-tombstone-secret' },
     modules: true,
     script: await getBundledWorker(),
   })

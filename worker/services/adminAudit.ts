@@ -43,6 +43,9 @@ export const ADMIN_AUDIT_ACTIONS = [
   'scoring_definition_updated',
   'scoring_definition_validated',
   'scoring_definition_published',
+  'research_sessions_viewed',
+  'research_data_exported',
+  'research_sessions_deleted',
 ] as const
 
 export type AdminAuditAction = typeof ADMIN_AUDIT_ACTIONS[number]
@@ -70,6 +73,7 @@ const SAFE_METADATA_KEYS = new Set([
   'metricCount',
   'fingerprint',
   'totalRdiEnabled',
+  'deletedCount',
 ])
 
 export function safeAdminAuditMetadata(

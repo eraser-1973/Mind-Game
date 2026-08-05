@@ -36,6 +36,23 @@ export type AdminAuditPage = {
   nextCursor: string | null
 }
 
+export type AdminResearchSession = {
+  sessionId: string
+  participantId: string
+  identity: { name: string | null; studentId: string | null; phone: string | null }
+  status: string
+  currentStep: string
+  startedAt: string | null
+  endedAt: string | null
+  completionType: string
+  taskVersion: string
+  materialVersion: string
+  configVersion: string
+  qualityFlags: string[]
+}
+
+export type AdminResearchPage = { items: AdminResearchSession[]; nextCursor: string | null }
+
 export type ConfigStatus = 'draft' | 'published' | 'retired'
 export type ValidationStatus = 'not_validated' | 'valid' | 'invalid' | 'stale'
 export type ConfigurationIssue = { code: string; path: string; message: string }

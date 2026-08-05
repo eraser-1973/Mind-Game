@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { AdminAuditLogPanel } from './AdminAuditLogPanel'
 import { AdminConfigurationConsole } from './AdminConfigurationConsole'
+import { AdminResearchPanel } from './AdminResearchPanel'
+import { AdminResearchExportPanel } from './AdminResearchExportPanel'
 import type { AdminAuditItem, AdminSessionData } from './adminTypes'
 
 export function AdminDashboard({
@@ -18,7 +20,7 @@ export function AdminDashboard({
   onLoadMore: () => Promise<void>
   onLogout: () => Promise<void>
 }) {
-  const [section, setSection] = useState<'configuration' | 'audit'>('configuration')
+  const [section, setSection] = useState<'configuration' | 'research' | 'export' | 'audit'>('configuration')
   return (
     <main className="admin-shell admin-shell--dashboard" data-testid="admin-dashboard">
       <header className="admin-console-header">
@@ -37,9 +39,11 @@ export function AdminDashboard({
       </section>
       <nav className="admin-dashboard-nav" aria-label="管理员功能">
         <button aria-pressed={section === 'configuration'} onClick={() => setSection('configuration')}>实验配置</button>
+        <button aria-pressed={section === 'research'} onClick={() => setSection('research')}>数据记录</button>
+        <button data-testid="admin-research-export-tab" aria-pressed={section === 'export'} onClick={() => setSection('export')}>导出数据</button>
         <button aria-pressed={section === 'audit'} onClick={() => setSection('audit')}>审计日志</button>
       </nav>
-      {section === 'configuration' ? <AdminConfigurationConsole /> : <AdminAuditLogPanel
+      {section === 'configuration' ? <AdminConfigurationConsole /> : section === 'research' ? <AdminResearchPanel /> : section === 'export' ? <AdminResearchExportPanel /> : <AdminAuditLogPanel
         items={audits}
         hasMore={nextCursor !== null}
         loading={loadingMore}

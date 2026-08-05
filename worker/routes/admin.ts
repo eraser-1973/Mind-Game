@@ -6,6 +6,7 @@ import { handleAdminLogout, handleAdminSession } from './adminSession'
 import { handleAdminConfiguration } from './adminConfiguration'
 import { handleAdminAnalysis } from './adminAnalysis'
 import { handleAdminAnalysisParameters } from './adminAnalysisParameters'
+import { handleAdminResearch } from './adminResearch'
 
 export function handleAdminRequest(
   request: Request,
@@ -22,6 +23,7 @@ export function handleAdminRequest(
     || path.startsWith('/api/admin/analysis/reliability-sets')
     || path.startsWith('/api/admin/analysis/scoring-definitions')) return handleAdminAnalysisParameters(request, env, requestId)
   if (path.startsWith('/api/admin/analysis/')) return handleAdminAnalysis(request, env, requestId)
+  if (path.startsWith('/api/admin/research/')) return handleAdminResearch(request, env, requestId)
   return adminErrorResponse(
     404,
     { code: 'NOT_FOUND', message: 'The requested administrator endpoint does not exist.' },

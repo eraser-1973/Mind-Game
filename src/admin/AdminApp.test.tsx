@@ -147,7 +147,7 @@ describe('isolated administrator application', () => {
     const serialized = JSON.stringify(renderer!.toJSON())
     expect(serialized).toContain('管理员控制台')
     expect(serialized).toContain('安全认证基础已启用')
-    expect(serialized).not.toMatch(/姓名|学号|手机号|问卷|导出|删除数据/)
+    expect(serialized).not.toMatch(/姓名|学号|手机号|问卷/)
 
     await act(async () => dashboard.props.onLoadMore())
     expect(paths.some((path) => path.includes('cursor=next-safe-cursor'))).toBe(true)

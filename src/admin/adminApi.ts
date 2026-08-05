@@ -5,6 +5,8 @@ import type {
   AdminConfigurationDetail,
   AdminMaterialDetail,
   AdminRuleDetail,
+  AdminResearchPage,
+  AdminResearchSession,
 } from './adminTypes'
 import { readAdminCsrfToken } from './adminCsrf'
 
@@ -131,6 +133,25 @@ async function configWrite<T>(path: string, method: 'POST' | 'PUT', body: unknow
 
 async function configGet<T>(path: string): Promise<T> {
   return parseResponse(await fetch(path, { method: 'GET', credentials: 'include' }))
+}
+
+async function researchWrite<T>(path: string, method: 'POST' | 'DELETE', body: unknown): Promise<T> {
+  const token = readAdminCsrfToken()
+  if (!token) throw new AdminApiError(403, 'ADMIN_CSRF_REJECTED', '绠＄悊鍛樺畨鍏ㄤ护鐗岀己澶便€?', '')
+  return parseResponse(await fetch(path, { method, credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token, ...(path.includes('delete') || method === 'DELETE' ? { 'Idempotency-Key': crypto.randomUUID() } : {}) }, body: JSON.stringify(body) }))
+}
+
+export const adminResearchApi = {
+  listSessions: (cursor: string | null = null) => configGet<AdminResearchPage>(`/api/admin/research/sessions?pageSize=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+  getSession: (sessionId: string) => configGet<AdminResearchSession>(`/api/admin/research/sessions/${encodeURIComponent(sessionId)}`),
+  exportAll: async () => {
+    const token = readAdminCsrfToken(); if (!token) throw new AdminApiError(403, 'ADMIN_CSRF_REJECTED', '绠＄悊鍛樺畨鍏ㄤ护鐗岀己澶便€?', '')
+    const response = await fetch('/api/admin/research/exports', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: '{}' })
+    if (!response.ok) await parseResponse(response)
+    return { blob: await response.blob(), filename: response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'mind-game-research.zip' }
+  },
+  deleteSession: (sessionId: string) => researchWrite(`/api/admin/research/sessions/${encodeURIComponent(sessionId)}`, 'DELETE', { confirmation: `DELETE SESSION ${sessionId}`, reasonCode: 'admin_delete' }),
+  bulkDelete: (sessionIds: string[]) => researchWrite('/api/admin/research/sessions/bulk-delete', 'POST', { sessionIds, confirmation: `DELETE ${sessionIds.length} SESSIONS`, reasonCode: 'admin_bulk_delete' }),
 }
 
 export const adminConfigurationApi = {

@@ -37,7 +37,7 @@ describe('GET /api/health', () => {
       data: {
         service: 'mind-game-api',
         database: 'reachable',
-        schemaVersion: '13',
+        schemaVersion: '14',
       },
     })
     expect(Number.isNaN(Date.parse(body.data.timestamp))).toBe(false)
