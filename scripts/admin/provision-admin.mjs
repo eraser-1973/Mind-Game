@@ -234,7 +234,7 @@ async function main() {
     executeSqlFile: (filePath) => executeSqlFile(mode, filePath),
     writeOutput: (value) => process.stdout.write(value),
     now: () => new Date().toISOString(),
-    randomUuid,
+    randomUuid: randomUUID,
     temporaryRoot: tmpdir(),
   })
 }

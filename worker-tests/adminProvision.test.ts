@@ -57,6 +57,12 @@ function harness(options: {
 }
 
 describe('offline single-administrator provisioning tool', () => {
+  it('wires Node randomUUID into the interactive CLI provisioner', async () => {
+    const source = await readFile(new URL('../scripts/admin/provision-admin.mjs', import.meta.url), 'utf8')
+
+    expect(source).toContain('randomUuid: randomUUID,')
+  })
+
   it('derives the same production PBKDF2 record shape without exposing a password', async () => {
     const record = await deriveNodePasswordRecord('Synthetic local password 123!')
     expect(record.passwordIterations).toBe(600000)
